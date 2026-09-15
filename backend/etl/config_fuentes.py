@@ -25,5 +25,11 @@ CONFIG_FUENTES = {
         "tipo_confianza": "Oficial",
         "url": "https://www.cisa.gov/news-events/cybersecurity-advisories",
         "fecha_ultima_actualizacion": date.today()
-    }
+    },
+    "NVD": {
+        "nombre": "National Vulnerability Database (NVD)",
+        "tipo_confianza": "Oficial",
+        "url": "https://services.nvd.nist.gov/rest/json/cves/2.0",
+        "fecha_ultima_actualizacion": date.today()
+    },
 }
