@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
 from typing import List
+from datetime import date
+from typing import Optional
 
 from app.database import get_db
 from app.models import Dominio, Tecnica, Control, ReglaDeteccion, ReporteAmenaza, tecnica_dominio
@@ -69,3 +71,24 @@ def obtener_metricas_dominio(nombre: str, db: Session = Depends(get_db)):
         total_reglas_deteccion=len(reglas_unicas),
         historial_amenazas=serie
     )
+
+    from datetime import date
+from typing import Optional
+
+class VulnerabilidadOut(BaseModel):
+    id: str
+    descripcion: str
+    fecha_publicacion: date
+    cvss_score: Optional[float] = None
+    cvss_severity: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+@router.get("/{nombre}/vulnerabilidades", response_model=List[VulnerabilidadOut])
+def listar_vulnerabilidades_por_dominio(nombre: str, db: Session = Depends(get_db)):
+    dom = db.query(Dominio).filter(Dominio.nombre.ilike(nombre)).first()
+    if not dom:
+        raise HTTPException(status_code=404, detail="Dominio no encontrado")
+
+    return dom.vulnerabilidades

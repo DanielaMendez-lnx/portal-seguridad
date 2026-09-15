@@ -107,8 +107,11 @@ def ejecutar_etl_nvd():
             print("[!] API Key no detectada. Usando modo público con límites estándar.")
 
         # Parámetros: filtra vulnerabilidades con palabra clave DNS (máximo 20 recientes para el MVP)
+        # Filtrar vulnerabilidades DNS recientes (ej. desde 2024 en adelante)
         params = {
             "keywordSearch": "DNS",
+            "pubStartDate": "2024-01-01T00:00:00.000",
+            "pubEndDate": "2024-12-31T23:59:59.000",
             "resultsPerPage": 20
         }
 
@@ -170,4 +173,3 @@ def ejecutar_etl_nvd():
 
 if __name__ == "__main__":
     ejecutar_etl_nvd()
-    
