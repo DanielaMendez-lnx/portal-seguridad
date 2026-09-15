@@ -1,9 +1,10 @@
 
 import sys
 import os
+import argparse
 import requests
-from datetime import datetime
-from typing import Optional, List
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 from pydantic import BaseModel, Field
 from sqlalchemy.dialects.postgresql import insert
 
@@ -24,24 +25,22 @@ class NvdCveData(BaseModel):
     cvss_score: Optional[float] = None
     cvss_severity: Optional[str] = "UNKNOWN"
 
+
 def parsear_vulnerabilidad(item: dict) -> Optional[NvdCveData]:
     """Valida y extrae los campos clave del JSON crudo de NVD."""
     cve_obj = item.get("cve", {})
     cve_id = cve_obj.get("id")
-    
-    # 1. Descripción en inglés
+
     descriptions = cve_obj.get("descriptions", [])
     desc_en = next((d.get("value") for d in descriptions if d.get("lang") == "en"), "")
     if not desc_en and descriptions:
         desc_en = descriptions[0].get("value", "")
 
-    # 2. Fecha de publicación
     published_str = cve_obj.get("published")
     if not published_str:
         return None
     published_dt = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
 
-    # 3. Métricas CVSS v3.1 / v3.0 / v2
     metrics = cve_obj.get("metrics", {})
     cvss_score = None
     cvss_severity = "UNKNOWN"
@@ -60,11 +59,37 @@ def parsear_vulnerabilidad(item: dict) -> Optional[NvdCveData]:
         descripcion=desc_en,
         fecha_publicacion=published_dt,
         cvss_score=cvss_score,
-        cvss_severity=cvss_severity
+        cvss_severity=cvss_severity,
     )
 
+
 # ==============================================================================
-# 2. LÓGICA DE INGESTA Y PERSISTENCIA (UPSERT)
+# 2. VENTANA DE FECHAS (respeta el máximo de 120 días de NVD)
+# ==============================================================================
+
+NVD_MAX_RANGO_DIAS = 120
+
+
+def calcular_ventana_fechas(modo: str) -> tuple[datetime, datetime]:
+    """
+    Calcula el rango pubStartDate/pubEndDate a consultar.
+    - 'backfill': trae los últimos 120 días completos (el máximo permitido por NVD),
+      pensado para la primera carga del proyecto.
+    - 'incremental': trae solo los últimos 3 días, pensado para la corrida diaria
+      automatizada vía GitHub Actions (sync incremental, bajo volumen).
+    """
+    end_date = datetime.now(timezone.utc)
+    dias = NVD_MAX_RANGO_DIAS if modo == "backfill" else 3
+    start_date = end_date - timedelta(days=dias)
+    return start_date, end_date
+
+
+def formatear_fecha_nvd(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.000")
+
+
+# ==============================================================================
+# 3. ENTIDADES BASE (Fuente y Dominio)
 # ==============================================================================
 
 def asegurar_entidades_base(db):
@@ -73,12 +98,12 @@ def asegurar_entidades_base(db):
         nombre=meta_fuente["nombre"],
         tipo_confianza=meta_fuente["tipo_confianza"],
         url=meta_fuente["url"],
-        fecha_ultima_actualizacion=meta_fuente["fecha_ultima_actualizacion"]
+        fecha_ultima_actualizacion=meta_fuente["fecha_ultima_actualizacion"],
     ).on_conflict_do_update(
         index_elements=["nombre"],
-        set_={"fecha_ultima_actualizacion": meta_fuente["fecha_ultima_actualizacion"]}
+        set_={"fecha_ultima_actualizacion": meta_fuente["fecha_ultima_actualizacion"]},
     ).returning(Fuente.id)
-    
+
     fuente_id = db.execute(stmt_fuente).scalar()
 
     stmt_dominio = insert(Dominio).values(nombre="DNS").on_conflict_do_nothing().returning(Dominio.id)
@@ -90,9 +115,15 @@ def asegurar_entidades_base(db):
     db.commit()
     return fuente_id, dominio_id
 
-def ejecutar_etl_nvd():
+
+# ==============================================================================
+# 4. LÓGICA DE INGESTA Y PERSISTENCIA (UPSERT)
+# ==============================================================================
+
+def ejecutar_etl_nvd(modo: str = "incremental"):
     db = SessionLocal()
     try:
+        print(f"[*] Modo de ejecución: {modo}")
         print("[*] Sincronizando fuente NVD y dominio DNS...")
         fuente_id, dominio_id = asegurar_entidades_base(db)
 
@@ -104,62 +135,69 @@ def ejecutar_etl_nvd():
             headers["apiKey"] = api_key
             print("[*] Usando NVD API Key provista en el entorno.")
         else:
-            print("[!] API Key no detectada. Usando modo público con límites estándar.")
+            print("[!] API Key no detectada. Usando modo público con límites estándar (5 req/30s).")
 
-        # Parámetros: filtra vulnerabilidades con palabra clave DNS (máximo 20 recientes para el MVP)
-        # Filtrar vulnerabilidades DNS recientes (ej. desde 2024 en adelante)
+        start_date, end_date = calcular_ventana_fechas(modo)
         params = {
             "keywordSearch": "DNS",
-            "pubStartDate": "2024-01-01T00:00:00.000",
-            "pubEndDate": "2024-12-31T23:59:59.000",
-            "resultsPerPage": 20
+            "pubStartDate": formatear_fecha_nvd(start_date),
+            "pubEndDate": formatear_fecha_nvd(end_date),
+            "resultsPerPage": 50,
         }
 
-        print(f"[*] Consultando API 2.0 de NVD ({api_url})...")
+        print(f"[*] Consultando NVD entre {params['pubStartDate']} y {params['pubEndDate']}...")
         resp = requests.get(api_url, headers=headers, params=params, timeout=30)
         resp.raise_for_status()
         data = resp.json()
 
         vulnerabilities_raw = data.get("vulnerabilities", [])
-        print(f"[*] Recibidos {len(vulnerabilities_raw)} registros de NVD. Validando con Pydantic...")
+        print(f"[*] Recibidos {len(vulnerabilities_raw)} registros crudos de NVD. Validando con Pydantic...")
 
-        cves_insertados = 0
-
+        # Validar y descartar inválidos
+        cves_validados = []
         for item in vulnerabilities_raw:
             try:
-                cve_validado = parsear_vulnerabilidad(item)
-                if not cve_validado:
-                    continue
+                cve = parsear_vulnerabilidad(item)
+                if cve:
+                    cves_validados.append(cve)
+            except Exception as item_err:
+                print(f"[!] Registro descartado por error de validación: {item_err}")
 
-                # 1. Upsert en tabla 'vulnerabilidades'
+        # NVD no garantiza el orden de los resultados: se ordena explícitamente
+        # por fecha de publicación, del más reciente al más antiguo.
+        cves_validados.sort(key=lambda c: c.fecha_publicacion, reverse=True)
+        print(f"[*] {len(cves_validados)} CVEs válidos tras ordenar por fecha de publicación.")
+
+        cves_insertados = 0
+        for cve_validado in cves_validados:
+            try:
                 stmt_cve = insert(Vulnerabilidad).values(
                     id=cve_validado.cve_id,
                     descripcion=cve_validado.descripcion,
                     fecha_publicacion=cve_validado.fecha_publicacion.date(),
                     cvss_score=cve_validado.cvss_score,
                     cvss_severity=cve_validado.cvss_severity,
-                    fuente_id=fuente_id
+                    fuente_id=fuente_id,
                 ).on_conflict_do_update(
                     index_elements=["id"],
                     set_={
                         "descripcion": cve_validado.descripcion,
                         "cvss_score": cve_validado.cvss_score,
-                        "cvss_severity": cve_validado.cvss_severity
-                    }
+                        "cvss_severity": cve_validado.cvss_severity,
+                    },
                 )
                 db.execute(stmt_cve)
 
-                # 2. Relación directa con el Dominio DNS
                 stmt_rel = insert(vulnerabilidad_dominio).values(
                     vulnerabilidad_id=cve_validado.cve_id,
-                    dominio_id=dominio_id
+                    dominio_id=dominio_id,
                 ).on_conflict_do_nothing()
                 db.execute(stmt_rel)
 
                 cves_insertados += 1
 
             except Exception as item_err:
-                print(f"[!] Error procesando registro CVE individual: {item_err}")
+                print(f"[!] Error procesando CVE {cve_validado.cve_id}: {item_err}")
                 continue
 
         db.commit()
@@ -171,5 +209,15 @@ def ejecutar_etl_nvd():
     finally:
         db.close()
 
+
 if __name__ == "__main__":
-    ejecutar_etl_nvd()
+    parser = argparse.ArgumentParser(description="ETL de ingesta de CVEs desde NVD.")
+    parser.add_argument(
+        "--modo",
+        choices=["backfill", "incremental"],
+        default="incremental",
+        help="'backfill' trae los últimos 120 días (carga inicial); "
+             "'incremental' trae solo los últimos 3 días (corrida diaria automatizada).",
+    )
+    args = parser.parse_args()
+    ejecutar_etl_nvd(modo=args.modo)
