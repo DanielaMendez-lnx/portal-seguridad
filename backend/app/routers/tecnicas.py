@@ -13,15 +13,19 @@ def obtener_tecnica(tecnica_id: str, db: Session = Depends(get_db)):
     if not tecnica:
         raise HTTPException(status_code=404, detail="Técnica no encontrada")
 
-    # Mapeo manual limpio hacia el esquema Pydantic
-    controles_dto = [
-        ControlOut(
-            codigo=rel.control.codigo,
-            nombre=rel.control.nombre,
-            marco=rel.control.marco_normativo.nombre
-        )
-        for rel in tecnica.controles_asociados
-    ]
+    # Deduplicar controles por código
+    controles_vistos = set()
+    controles_dto = []
+    for rel in tecnica.controles_asociados:
+        if rel.control.codigo not in controles_vistos:
+            controles_dto.append(
+                ControlOut(
+                    codigo=rel.control.codigo,
+                    nombre=rel.control.nombre,
+                    marco=rel.control.marco_normativo.nombre
+                )
+            )
+            controles_vistos.add(rel.control.codigo)
 
     reglas_dto = [
         ReglaOut(

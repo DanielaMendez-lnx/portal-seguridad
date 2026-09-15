@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import tecnicas
+from app.routers import tecnicas, dominios
 
 app = FastAPI(
     title="Portal de Ciberseguridad Unificado API",
@@ -8,7 +8,6 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# Configuración básica de CORS para que el frontend pueda consumir la API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,6 +17,7 @@ app.add_middleware(
 )
 
 app.include_router(tecnicas.router)
+app.include_router(dominios.router)
 
 @app.get("/")
 def health_check():
