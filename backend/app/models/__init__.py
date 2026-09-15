@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Text, Date, 
+    Column, Integer, String, Text, Date, Float,
     ForeignKey, Table, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
@@ -33,6 +33,14 @@ tecnica_reporte = Table(
     Column("reporte_id", Integer, ForeignKey("reportes_amenaza.id", ondelete="CASCADE"), primary_key=True)
 )
 
+# Relación Vulnerabilidad (CVE) <-> Dominio
+vulnerabilidad_dominio = Table(
+    "vulnerabilidad_dominio",
+    Base.metadata,
+    Column("vulnerabilidad_id", String(50), ForeignKey("vulnerabilidades.id", ondelete="CASCADE"), primary_key=True),
+    Column("dominio_id", Integer, ForeignKey("dominios.id", ondelete="CASCADE"), primary_key=True)
+)
+
 
 # ==========================================
 # 2. ENTIDADES PRINCIPALES
@@ -44,8 +52,9 @@ class Dominio(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(50), unique=True, nullable=False)  # ej. DNS, Cloud, Autenticacion
 
-    # Relación inversa
+    # Relaciones inversas
     tecnicas = relationship("Tecnica", secondary=tecnica_dominio, back_populates="dominios")
+    vulnerabilidades = relationship("Vulnerabilidad", secondary=vulnerabilidad_dominio, back_populates="dominios")
 
 
 class MarcoNormativo(Base):
@@ -62,7 +71,7 @@ class Fuente(Base):
     __tablename__ = "fuentes"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(100), unique=True, nullable=False) # ej. CTID, SigmaHQ, CISA
+    nombre = Column(String(100), unique=True, nullable=False) # ej. CTID, SigmaHQ, CISA, NVD
     tipo_confianza = Column(String(30), nullable=False)       # Oficial, Comunidad, Propio
     url = Column(Text, nullable=True)
     fecha_ultima_actualizacion = Column(Date, nullable=True)
@@ -70,6 +79,7 @@ class Fuente(Base):
     reglas = relationship("ReglaDeteccion", back_populates="fuente")
     reportes = relationship("ReporteAmenaza", back_populates="fuente")
     mapeos_controles = relationship("TecnicaControl", back_populates="fuente")
+    vulnerabilidades = relationship("Vulnerabilidad", back_populates="fuente")
 
 
 class Tecnica(Base):
@@ -97,7 +107,6 @@ class Control(Base):
     nombre = Column(String(200), nullable=False)
     marco_id = Column(Integer, ForeignKey("marcos_normativos.id", ondelete="RESTRICT"), nullable=False)
 
-    # Restricción: no puede repetirse el mismo código dentro del mismo marco
     __table_args__ = (UniqueConstraint("codigo", "marco_id", name="uq_control_marco"),)
 
     marco_normativo = relationship("MarcoNormativo", back_populates="controles")
@@ -109,10 +118,6 @@ class Control(Base):
 # ==========================================
 
 class TecnicaControl(Base):
-    """
-    Tabla intermedia entre Técnica y Control que registra 
-    la fuente oficial que valida el mapeo de mitigación.
-    """
     __tablename__ = "tecnica_control"
 
     tecnica_id = Column(String(20), ForeignKey("tecnicas.id", ondelete="CASCADE"), primary_key=True)
@@ -152,4 +157,22 @@ class ReporteAmenaza(Base):
 
     fuente = relationship("Fuente", back_populates="reportes")
     tecnicas = relationship("Tecnica", secondary=tecnica_reporte, back_populates="reportes")
-    
+
+
+# ==========================================
+# 5. VULNERABILIDADES (NVD / CVE)
+# ==========================================
+
+class Vulnerabilidad(Base):
+    __tablename__ = "vulnerabilidades"
+
+    id = Column(String(50), primary_key=True)  # Formato: CVE-YYYY-NNNN
+    descripcion = Column(Text, nullable=False)
+    fecha_publicacion = Column(Date, nullable=False)
+    cvss_score = Column(Float, nullable=True)
+    cvss_severity = Column(String(20), nullable=True)  # LOW, MEDIUM, HIGH, CRITICAL
+
+    fuente_id = Column(Integer, ForeignKey("fuentes.id", ondelete="RESTRICT"), nullable=False)
+
+    fuente = relationship("Fuente", back_populates="vulnerabilidades")
+    dominios = relationship("Dominio", secondary=vulnerabilidad_dominio, back_populates="vulnerabilidades")
