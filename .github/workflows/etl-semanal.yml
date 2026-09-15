@@ -44,4 +44,5 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           python backend/etl/ingest_sigma.py
-          
+
+      

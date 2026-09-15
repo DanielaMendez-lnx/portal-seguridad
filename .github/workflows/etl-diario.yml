@@ -1,0 +1,36 @@
+
+
+name: ETL Diario (NVD CVEs)
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # Todos los días a las 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ingesta-vulnerabilidades:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias del backend
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Ejecutar ETL NVD (Incremental)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          python backend/etl/ingest_nvd.py --modo incremental
+
+          
