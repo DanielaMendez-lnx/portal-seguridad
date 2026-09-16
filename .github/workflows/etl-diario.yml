@@ -4,7 +4,7 @@ name: ETL Diario (NVD CVEs)
 
 on:
   schedule:
-    - cron: '0 6 * * *' # Todos los días a las 06:00 UTC
+    - cron: '0 6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -30,7 +30,5 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          python backend/etl/ingest_nvd.py --modo incremental
+        run: python backend/etl/ingest_nvd.py --modo incremental
 
-          

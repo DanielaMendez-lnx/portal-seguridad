@@ -10,6 +10,7 @@ from typing import Optional
 
 from app.database import get_db
 from app.models import Dominio, Tecnica, Control, ReglaDeteccion, ReporteAmenaza, tecnica_dominio
+from app.models import Dominio, Vulnerabilidad
 
 router = APIRouter(prefix="/dominios", tags=["Dominios & Métricas"])
 
@@ -91,4 +92,14 @@ def listar_vulnerabilidades_por_dominio(nombre: str, db: Session = Depends(get_d
     if not dom:
         raise HTTPException(status_code=404, detail="Dominio no encontrado")
 
-    return dom.vulnerabilidades
+    # Consulta explícita: orden descendente por fecha de publicación
+    vulnerabilidades = (
+        db.query(Vulnerabilidad)
+        .join(Vulnerabilidad.dominios)
+        .filter(Dominio.id == dom.id)
+        .order_by(Vulnerabilidad.fecha_publicacion.desc())
+        .limit(20)
+        .all()
+    )
+
+    return vulnerabilidades

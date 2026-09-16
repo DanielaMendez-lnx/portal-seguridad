@@ -6,10 +6,9 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 # ==========================================
-# 1. TABLAS INTERMEDIAS (Muchos a Muchos puros)
+# 1. TABLAS INTERMEDIAS
 # ==========================================
 
-# Relación Técnica <-> Dominio
 tecnica_dominio = Table(
     "tecnica_dominio",
     Base.metadata,
@@ -17,7 +16,6 @@ tecnica_dominio = Table(
     Column("dominio_id", Integer, ForeignKey("dominios.id", ondelete="CASCADE"), primary_key=True)
 )
 
-# Relación Técnica <-> Regla de Detección
 tecnica_regla = Table(
     "tecnica_regla",
     Base.metadata,
@@ -25,7 +23,6 @@ tecnica_regla = Table(
     Column("regla_id", Integer, ForeignKey("reglas_deteccion.id", ondelete="CASCADE"), primary_key=True)
 )
 
-# Relación Técnica <-> Reporte de Amenaza
 tecnica_reporte = Table(
     "tecnica_reporte",
     Base.metadata,
@@ -33,14 +30,12 @@ tecnica_reporte = Table(
     Column("reporte_id", Integer, ForeignKey("reportes_amenaza.id", ondelete="CASCADE"), primary_key=True)
 )
 
-# Relación Vulnerabilidad (CVE) <-> Dominio
 vulnerabilidad_dominio = Table(
     "vulnerabilidad_dominio",
     Base.metadata,
     Column("vulnerabilidad_id", String(50), ForeignKey("vulnerabilidades.id", ondelete="CASCADE"), primary_key=True),
     Column("dominio_id", Integer, ForeignKey("dominios.id", ondelete="CASCADE"), primary_key=True)
 )
-
 
 # ==========================================
 # 2. ENTIDADES PRINCIPALES
@@ -50,9 +45,8 @@ class Dominio(Base):
     __tablename__ = "dominios"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(50), unique=True, nullable=False)  # ej. DNS, Cloud, Autenticacion
+    nombre = Column(String(50), unique=True, nullable=False)
 
-    # Relaciones inversas
     tecnicas = relationship("Tecnica", secondary=tecnica_dominio, back_populates="dominios")
     vulnerabilidades = relationship("Vulnerabilidad", secondary=vulnerabilidad_dominio, back_populates="dominios")
 
@@ -61,8 +55,8 @@ class MarcoNormativo(Base):
     __tablename__ = "marcos_normativos"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(100), nullable=False)  # ej. NIST SP 800-53
-    version = Column(String(20), nullable=True)   # ej. Rev. 5
+    nombre = Column(String(100), nullable=False)
+    version = Column(String(20), nullable=True)
 
     controles = relationship("Control", back_populates="marco_normativo")
 
@@ -71,8 +65,8 @@ class Fuente(Base):
     __tablename__ = "fuentes"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(100), unique=True, nullable=False) # ej. CTID, SigmaHQ, CISA, NVD
-    tipo_confianza = Column(String(30), nullable=False)       # Oficial, Comunidad, Propio
+    nombre = Column(String(100), unique=True, nullable=False)
+    tipo_confianza = Column(String(30), nullable=False)
     url = Column(Text, nullable=True)
     fecha_ultima_actualizacion = Column(Date, nullable=True)
 
@@ -85,17 +79,14 @@ class Fuente(Base):
 class Tecnica(Base):
     __tablename__ = "tecnicas"
 
-    id = Column(String(20), primary_key=True)     # ej. T1071.004
-    nombre = Column(String(150), nullable=False)  # ej. DNS
+    id = Column(String(20), primary_key=True)
+    nombre = Column(String(150), nullable=False)
     descripcion = Column(Text, nullable=True)
-    tactica = Column(String(50), nullable=False)  # ej. Command and Control
+    tactica = Column(String(50), nullable=False)
 
-    # Relaciones Muchos a Muchos
     dominios = relationship("Dominio", secondary=tecnica_dominio, back_populates="tecnicas")
     reglas = relationship("ReglaDeteccion", secondary=tecnica_regla, back_populates="tecnicas")
     reportes = relationship("ReporteAmenaza", secondary=tecnica_reporte, back_populates="tecnicas")
-    
-    # Relación con Controles a través de la tabla intermedia con metadatos
     controles_asociados = relationship("TecnicaControl", back_populates="tecnica")
 
 
@@ -103,7 +94,7 @@ class Control(Base):
     __tablename__ = "controles"
 
     id = Column(Integer, primary_key=True, index=True)
-    codigo = Column(String(30), nullable=False)   # ej. AC-17, SC-20
+    codigo = Column(String(30), nullable=False)
     nombre = Column(String(200), nullable=False)
     marco_id = Column(Integer, ForeignKey("marcos_normativos.id", ondelete="RESTRICT"), nullable=False)
 
@@ -112,10 +103,6 @@ class Control(Base):
     marco_normativo = relationship("MarcoNormativo", back_populates="controles")
     tecnicas_asociadas = relationship("TecnicaControl", back_populates="control")
 
-
-# ==========================================
-# 3. TABLA ASOCIATIVA CON ATRIBUTO FUENTE
-# ==========================================
 
 class TecnicaControl(Base):
     __tablename__ = "tecnica_control"
@@ -129,16 +116,12 @@ class TecnicaControl(Base):
     fuente = relationship("Fuente", back_populates="mapeos_controles")
 
 
-# ==========================================
-# 4. REGLAS Y REPORTES
-# ==========================================
-
 class ReglaDeteccion(Base):
     __tablename__ = "reglas_deteccion"
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(200), nullable=False)
-    formato = Column(String(30), nullable=False)  # Sigma, KQL, SPL
+    formato = Column(String(30), nullable=False)
     log_source = Column(String(100), nullable=True)
     fuente_id = Column(Integer, ForeignKey("fuentes.id", ondelete="RESTRICT"), nullable=False)
 
@@ -159,20 +142,17 @@ class ReporteAmenaza(Base):
     tecnicas = relationship("Tecnica", secondary=tecnica_reporte, back_populates="reportes")
 
 
-# ==========================================
-# 5. VULNERABILIDADES (NVD / CVE)
-# ==========================================
-
 class Vulnerabilidad(Base):
     __tablename__ = "vulnerabilidades"
 
-    id = Column(String(50), primary_key=True)  # Formato: CVE-YYYY-NNNN
+    id = Column(String(50), primary_key=True)
     descripcion = Column(Text, nullable=False)
     fecha_publicacion = Column(Date, nullable=False)
     cvss_score = Column(Float, nullable=True)
-    cvss_severity = Column(String(20), nullable=True)  # LOW, MEDIUM, HIGH, CRITICAL
+    cvss_severity = Column(String(20), nullable=True)
 
     fuente_id = Column(Integer, ForeignKey("fuentes.id", ondelete="RESTRICT"), nullable=False)
 
     fuente = relationship("Fuente", back_populates="vulnerabilidades")
+    # Corrige aquí: debe apuntar al atributo 'vulnerabilidades' de Dominio
     dominios = relationship("Dominio", secondary=vulnerabilidad_dominio, back_populates="vulnerabilidades")
