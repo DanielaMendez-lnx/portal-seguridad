@@ -12,12 +12,14 @@ CONFIG_FUENTES = {
         "nombre": "Mappings Explorer (CTID)",
         "tipo_confianza": "Oficial",
         "url": "https://center-for-threat-informed-defense.github.io/mappings-explorer/",
+        "dataset_url": "https://raw.githubusercontent.com/center-for-threat-informed-defense/mappings-explorer/main/mappings/nist_800_53/attack-16.1/nist_800_53-rev5/enterprise/nist_800_53-rev5_attack-16.1-enterprise.json",
         "fecha_ultima_actualizacion": date.today()
     },
     "SigmaHQ": {
         "nombre": "SigmaHQ",
         "tipo_confianza": "Comunidad",
         "url": "https://github.com/SigmaHQ/sigma",
+        "dataset_url": "https://github.com/SigmaHQ/sigma/releases/latest/download/sigma_all_rules.zip",
         "fecha_ultima_actualizacion": date.today()
     },
     "CISA": {
