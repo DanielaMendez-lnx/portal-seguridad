@@ -22,7 +22,10 @@ def obtener_tecnica(tecnica_id: str, db: Session = Depends(get_db)):
                 ControlOut(
                     codigo=rel.control.codigo,
                     nombre=rel.control.nombre,
-                    marco=rel.control.marco_normativo.nombre
+                    marco=rel.control.marco_normativo.nombre if rel.control.marco_normativo else "NIST SP 800-53",
+                    tipo_confianza=rel.fuente.tipo_confianza if rel.fuente else "Propio",
+                    fuente_nombre=rel.fuente.nombre if rel.fuente else None,
+                    fuente_url=rel.fuente.url if rel.fuente else None,
                 )
             )
             controles_vistos.add(rel.control.codigo)

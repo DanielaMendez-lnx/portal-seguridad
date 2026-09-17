@@ -7,6 +7,10 @@ import { ShieldAlert, ShieldCheck, Terminal, Search, ChevronDown, ChevronUp } fr
 export interface Control {
   codigo: string;
   nombre: string;
+  marco?: string;
+  tipo_confianza?: string;
+  fuente_nombre?: string | null;
+  fuente_url?: string | null;
 }
 
 export interface Regla {
@@ -33,6 +37,19 @@ export default function SeccionTecnicas({ tecnicas }: Props) {
   const [busqueda, setBusqueda] = useState("");
   const [tacticaSeleccionada, setTacticaSeleccionada] = useState("TODAS");
   const [tecnicaExpandida, setTecnicaExpandida] = useState<string | null>(null);
+
+  const getConfidenceBadge = (tipo?: string) => {
+    switch (tipo?.toLowerCase()) {
+      case "oficial":
+        return "bg-emerald-950/80 text-emerald-400 border-emerald-800/60";
+      case "comunidad":
+        return "bg-amber-950/80 text-amber-400 border-amber-800/60";
+      case "propio":
+        return "bg-slate-800/80 text-slate-400 border-slate-700/60";
+      default:
+        return "bg-slate-800/80 text-slate-400 border-slate-700/60";
+    }
+  };
 
   // Extraer lista única de tácticas
   const tacticas = ["TODAS", ...Array.from(new Set(tecnicas.map((t) => t.tactica)))];
@@ -166,13 +183,43 @@ export default function SeccionTecnicas({ tecnicas }: Props) {
                         {t.controles.length === 0 ? (
                           <p className="text-xs text-slate-500">Sin mapeo directo disponible.</p>
                         ) : (
-                          <ul className="space-y-1.5">
-                            {t.controles.map((c) => (
-                              <li key={c.codigo} className="text-xs text-slate-300 flex items-start gap-1.5">
-                                <span className="font-mono text-emerald-400 font-medium">
-                                  {c.codigo}:
-                                </span>
-                                <span>{c.nombre}</span>
+                          <ul className="space-y-2">
+                            {t.controles.map((c, idx) => (
+                              <li
+                                key={`${c.codigo}-${idx}`}
+                                className="text-xs text-slate-300 flex items-start justify-between gap-2.5 p-1 rounded hover:bg-slate-800/30 transition-colors"
+                              >
+                                <div className="flex items-start gap-1.5 flex-1 min-w-0">
+                                  <span className="font-mono text-emerald-400 font-medium shrink-0">
+                                    {c.codigo}:
+                                  </span>
+                                  <span className="leading-snug">{c.nombre}</span>
+                                </div>
+                                {c.tipo_confianza && (
+                                  c.fuente_url ? (
+                                    <a
+                                      href={c.fuente_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold tracking-wide shrink-0 transition-opacity hover:opacity-80 ${getConfidenceBadge(
+                                        c.tipo_confianza
+                                      )}`}
+                                      title={c.fuente_nombre ? `Fuente: ${c.fuente_nombre} (Abrir referencia oficial)` : "Abrir referencia"}
+                                    >
+                                      {c.tipo_confianza}
+                                    </a>
+                                  ) : (
+                                    <span
+                                      className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold tracking-wide shrink-0 ${getConfidenceBadge(
+                                        c.tipo_confianza
+                                      )}`}
+                                      title={c.fuente_nombre ? `Fuente: ${c.fuente_nombre}` : undefined}
+                                    >
+                                      {c.tipo_confianza}
+                                    </span>
+                                  )
+                                )}
                               </li>
                             ))}
                           </ul>

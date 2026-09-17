@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, selectinload, joinedload
 from pydantic import BaseModel
 from app.database import get_db
-from app.models import Dominio, Vulnerabilidad, Tecnica, TecnicaControl
+from app.models import Dominio, Vulnerabilidad, Tecnica, TecnicaControl, Control
 
 router = APIRouter(prefix="/dominios", tags=["Dominios & Métricas"])
 
@@ -53,7 +53,11 @@ def listar_tecnicas_por_dominio(nombre: str, db: Session = Depends(get_db)):
         .options(
             selectinload(Dominio.tecnicas)
             .selectinload(Tecnica.controles_asociados)
-            .joinedload(TecnicaControl.control),
+            .joinedload(TecnicaControl.control)
+            .joinedload(Control.marco_normativo),
+            selectinload(Dominio.tecnicas)
+            .selectinload(Tecnica.controles_asociados)
+            .joinedload(TecnicaControl.fuente),
             selectinload(Dominio.tecnicas)
             .selectinload(Tecnica.reglas),
         )
@@ -73,7 +77,11 @@ def listar_tecnicas_por_dominio(nombre: str, db: Session = Depends(get_db)):
             "controles": [
                 {
                     "codigo": tc.control.codigo,
-                    "nombre": tc.control.nombre
+                    "nombre": tc.control.nombre,
+                    "marco": tc.control.marco_normativo.nombre if tc.control.marco_normativo else "NIST SP 800-53",
+                    "tipo_confianza": tc.fuente.tipo_confianza if tc.fuente else "Propio",
+                    "fuente_nombre": tc.fuente.nombre if tc.fuente else None,
+                    "fuente_url": tc.fuente.url if tc.fuente else None,
                 }
                 for tc in t.controles_asociados if tc.control
             ],

@@ -156,5 +156,4 @@ class Vulnerabilidad(Base):
     fuente_id = Column(Integer, ForeignKey("fuentes.id", ondelete="RESTRICT"), nullable=False)
 
     fuente = relationship("Fuente", back_populates="vulnerabilidades")
-    # Corrige aquí: debe apuntar al atributo 'vulnerabilidades' de Dominio
     dominios = relationship("Dominio", secondary=vulnerabilidad_dominio, back_populates="vulnerabilidades")

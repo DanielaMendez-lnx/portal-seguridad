@@ -4,7 +4,10 @@ from typing import List, Optional
 class ControlOut(BaseModel):
     codigo: str
     nombre: str
-    marco: str
+    marco: Optional[str] = None
+    tipo_confianza: str
+    fuente_nombre: Optional[str] = None
+    fuente_url: Optional[str] = None
 
     class Config:
         from_attributes = True
