@@ -1,6 +1,7 @@
 
 import sys
 import os
+import time
 import argparse
 import requests
 from datetime import datetime, timedelta, timezone
@@ -134,8 +135,10 @@ def ejecutar_etl_nvd(modo: str = "incremental"):
         if api_key:
             headers["apiKey"] = api_key
             print("[*] Usando NVD API Key provista en el entorno.")
+            delay_segundos = 2
         else:
             print("[!] API Key no detectada. Usando modo público con límites estándar (5 req/30s).")
+            delay_segundos = 6
 
         start_date, end_date = calcular_ventana_fechas(modo)
         params = {
@@ -146,12 +149,45 @@ def ejecutar_etl_nvd(modo: str = "incremental"):
         }
 
         print(f"[*] Consultando NVD entre {params['pubStartDate']} y {params['pubEndDate']}...")
-        resp = requests.get(api_url, headers=headers, params=params, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
 
-        vulnerabilities_raw = data.get("vulnerabilities", [])
-        print(f"[*] Recibidos {len(vulnerabilities_raw)} registros crudos de NVD. Validando con Pydantic...")
+        vulnerabilities_raw = []
+        start_index = 0
+        pagina = 1
+        total_paginas = 1
+
+        while True:
+            params["startIndex"] = start_index
+            if modo == "backfill":
+                if total_paginas > 1:
+                    print(f"[*] [Pagina {pagina} de {total_paginas}] Consultando NVD (startIndex={start_index})...")
+                else:
+                    print(f"[*] [Pagina {pagina}] Consultando NVD inicial...")
+
+            resp = requests.get(api_url, headers=headers, params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+
+            items = data.get("vulnerabilities", [])
+            total_results = data.get("totalResults", len(items))
+            results_per_page = data.get("resultsPerPage", 50)
+            vulnerabilities_raw.extend(items)
+
+            if total_results > 0 and results_per_page > 0:
+                total_paginas = (total_results + results_per_page - 1) // results_per_page
+
+            print(f"[*] Recibidos {len(items)} registros en esta página. (Total acumulado: {len(vulnerabilities_raw)}/{total_results})")
+
+            # Si es incremental o ya se cubrieron todos los resultados, terminar el bucle
+            if modo != "backfill" or len(vulnerabilities_raw) >= total_results or len(items) == 0:
+                break
+
+            start_index += results_per_page
+            pagina += 1
+
+            print(f"[*] Esperando {delay_segundos}s para respetar el rate limit de NVD...")
+            time.sleep(delay_segundos)
+
+        print(f"[*] Total de registros crudos obtenidos: {len(vulnerabilities_raw)}. Validando con Pydantic...")
 
         # Validar y descartar inválidos
         cves_validados = []
@@ -201,11 +237,11 @@ def ejecutar_etl_nvd(modo: str = "incremental"):
                 continue
 
         db.commit()
-        print(f"[✓] Pipeline NVD finalizado: {cves_insertados} CVEs persistidos y asociados al dominio DNS.")
+        print(f"[OK] Pipeline NVD finalizado: {cves_insertados} CVEs persistidos y asociados al dominio DNS.")
 
     except Exception as e:
         db.rollback()
-        print(f"[!] Error crítico en ETL NVD: {e}")
+        print(f"[ERROR] Error en ETL NVD: {e}")
     finally:
         db.close()
 

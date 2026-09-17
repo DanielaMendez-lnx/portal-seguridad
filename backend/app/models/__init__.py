@@ -58,6 +58,8 @@ class MarcoNormativo(Base):
     nombre = Column(String(100), nullable=False)
     version = Column(String(20), nullable=True)
 
+    __table_args__ = (UniqueConstraint("nombre", "version", name="uq_marco_nombre_version"),)
+
     controles = relationship("Control", back_populates="marco_normativo")
 
 
