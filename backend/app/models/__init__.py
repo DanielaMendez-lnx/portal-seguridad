@@ -37,6 +37,13 @@ vulnerabilidad_dominio = Table(
     Column("dominio_id", Integer, ForeignKey("dominios.id", ondelete="CASCADE"), primary_key=True)
 )
 
+reporte_dominio = Table(
+    "reporte_dominio",
+    Base.metadata,
+    Column("reporte_id", Integer, ForeignKey("reportes_amenaza.id", ondelete="CASCADE"), primary_key=True),
+    Column("dominio_id", Integer, ForeignKey("dominios.id", ondelete="CASCADE"), primary_key=True)
+)
+
 # ==========================================
 # 2. ENTIDADES PRINCIPALES
 # ==========================================
@@ -49,6 +56,7 @@ class Dominio(Base):
 
     tecnicas = relationship("Tecnica", secondary=tecnica_dominio, back_populates="dominios")
     vulnerabilidades = relationship("Vulnerabilidad", secondary=vulnerabilidad_dominio, back_populates="dominios")
+    reportes = relationship("ReporteAmenaza", secondary=reporte_dominio, back_populates="dominios")
 
 
 class MarcoNormativo(Base):
@@ -139,9 +147,15 @@ class ReporteAmenaza(Base):
     fecha_publicacion = Column(Date, nullable=False)
     contador_incidencias = Column(Integer, default=1)
     fuente_id = Column(Integer, ForeignKey("fuentes.id", ondelete="RESTRICT"), nullable=False)
+    fuente_ref_id = Column(String(200), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("fuente_ref_id", "fuente_id", name="uq_reporte_fuente_ref"),
+    )
 
     fuente = relationship("Fuente", back_populates="reportes")
     tecnicas = relationship("Tecnica", secondary=tecnica_reporte, back_populates="reportes")
+    dominios = relationship("Dominio", secondary=reporte_dominio, back_populates="reportes")
 
 
 class Vulnerabilidad(Base):

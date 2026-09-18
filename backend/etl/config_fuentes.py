@@ -26,6 +26,7 @@ CONFIG_FUENTES = {
         "nombre": "CISA Advisories",
         "tipo_confianza": "Oficial",
         "url": "https://www.cisa.gov/news-events/cybersecurity-advisories",
+        "feed_url": "https://www.cisa.gov/cybersecurity-advisories/all.xml",
         "fecha_ultima_actualizacion": date.today()
     },
     "NVD": {

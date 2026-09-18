@@ -1,11 +1,14 @@
 
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date, timedelta
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload, joinedload
 from pydantic import BaseModel
 from app.database import get_db
 from app.models import Dominio, Vulnerabilidad, Tecnica, TecnicaControl, Control
+from app.schemas import TendenciaMesOut
 
 router = APIRouter(prefix="/dominios", tags=["Dominios & Métricas"])
 
@@ -19,33 +22,105 @@ class VulnerabilidadOut(BaseModel):
     class Config:
         from_attributes = True
 
+class VulnerabilidadListOut(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: List[VulnerabilidadOut]
+
 # 1. Endpoint de Vulnerabilidades (NVD)
-@router.get("/{nombre}/vulnerabilidades", response_model=List[VulnerabilidadOut])
-def listar_vulnerabilidades_por_dominio(nombre: str, db: Session = Depends(get_db)):
+@router.get("/{nombre}/vulnerabilidades", response_model=VulnerabilidadListOut)
+def listar_vulnerabilidades_por_dominio(
+    nombre: str,
+    limit: Optional[int] = Query(default=40, ge=1, le=500, description="Cantidad máxima de registros a devolver (por defecto 40)"),
+    offset: int = Query(default=0, ge=0, description="Número de registros a omitir para paginación"),
+    db: Session = Depends(get_db)
+):
     dom = db.query(Dominio).filter(Dominio.nombre.ilike(nombre)).first()
     if not dom:
         raise HTTPException(status_code=404, detail="Dominio no encontrado")
 
-    vulnerabilidades = (
+    base_query = (
         db.query(Vulnerabilidad)
         .join(Vulnerabilidad.dominios)
         .filter(Dominio.id == dom.id)
-        .order_by(Vulnerabilidad.fecha_publicacion.desc())
+    )
+
+    total = base_query.count()
+
+    query = base_query.order_by(Vulnerabilidad.fecha_publicacion.desc())
+
+    if offset > 0:
+        query = query.offset(offset)
+    if limit is not None and limit > 0:
+        query = query.limit(limit)
+
+    vulnerabilidades = query.all()
+
+    return {
+        "total": total,
+        "limit": limit or total,
+        "offset": offset,
+        "items": [
+            {
+                "id": v.id,
+                "descripcion": v.descripcion,
+                "fecha_publicacion": str(v.fecha_publicacion),
+                "cvss_score": v.cvss_score,
+                "cvss_severity": v.cvss_severity,
+            }
+            for v in vulnerabilidades
+        ],
+    }
+
+# 2. Endpoint de Tendencia de Vulnerabilidades por Mes
+@router.get("/{nombre}/vulnerabilidades/tendencia", response_model=List[TendenciaMesOut])
+def obtener_tendencia_vulnerabilidades(
+    nombre: str,
+    rango: str = Query(default="6m", pattern="^(6m|1y)$", description="Rango temporal: '6m' (últimos 6 meses) o '1y' (último año)"),
+    db: Session = Depends(get_db)
+):
+    dom = db.query(Dominio).filter(Dominio.nombre.ilike(nombre)).first()
+    if not dom:
+        raise HTTPException(status_code=404, detail="Dominio no encontrado")
+
+    cant_meses = 6 if rango == "6m" else 12
+    hoy = date.today()
+    curr = date(hoy.year, hoy.month, 1)
+
+    meses_esperados = []
+    for _ in range(cant_meses):
+        meses_esperados.append(curr.strftime("%Y-%m"))
+        ultimo_dia_ant = curr - timedelta(days=1)
+        curr = date(ultimo_dia_ant.year, ultimo_dia_ant.month, 1)
+    meses_esperados.reverse()
+
+    primer_mes_str = meses_esperados[0]
+    y_ini, m_ini = map(int, primer_mes_str.split("-"))
+    fecha_inicio = date(y_ini, m_ini, 1)
+
+    mes_col = func.to_char(Vulnerabilidad.fecha_publicacion, "YYYY-MM")
+    resultados = (
+        db.query(
+            mes_col.label("mes"),
+            func.count(Vulnerabilidad.id).label("total")
+        )
+        .join(Vulnerabilidad.dominios)
+        .filter(
+            Dominio.id == dom.id,
+            Vulnerabilidad.fecha_publicacion >= fecha_inicio
+        )
+        .group_by(mes_col)
         .all()
     )
 
+    conteo_db = {r.mes: r.total for r in resultados}
     return [
-        {
-            "id": v.id,
-            "descripcion": v.descripcion,
-            "fecha_publicacion": str(v.fecha_publicacion),
-            "cvss_score": v.cvss_score,
-            "cvss_severity": v.cvss_severity,
-        }
-        for v in vulnerabilidades
+        {"mes": m, "total": conteo_db.get(m, 0)}
+        for m in meses_esperados
     ]
 
-# 2. Endpoint de Técnicas (ATT&CK + NIST + Sigma)
+# 3. Endpoint de Técnicas (ATT&CK + NIST + Sigma)
 @router.get("/{nombre}/tecnicas")
 def listar_tecnicas_por_dominio(nombre: str, db: Session = Depends(get_db)):
     dom = (

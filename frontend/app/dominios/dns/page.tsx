@@ -3,27 +3,41 @@
 import Link from "next/link";
 import { ArrowLeft, ShieldAlert, AlertTriangle, ShieldCheck, Activity } from "lucide-react";
 import GraficoSeveridad from "./GraficoSeveridad";
+import GraficoTendenciaCVEs, { TendenciaMes } from "./GraficoTendenciaCVEs";
 import SeccionTecnicas, { Tecnica } from "./SeccionTecnicas";
+import SeccionVulnerabilidades, { Vulnerabilidad } from "./SeccionVulnerabilidades";
 
-interface Vulnerabilidad {
-  id: string;
-  descripcion: string;
-  fecha_publicacion: string;
-  cvss_score: number | null;
-  cvss_severity: string | null;
+interface VulnerabilidadesResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  items: Vulnerabilidad[];
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-async function getVulnerabilidades(): Promise<Vulnerabilidad[]> {
+async function getVulnerabilidades(): Promise<VulnerabilidadesResponse> {
   try {
     const res = await fetch(`${API_BASE}/dominios/DNS/vulnerabilidades`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return { total: 0, limit: 40, offset: 0, items: [] };
+    return await res.json();
+  } catch (error) {
+    console.error("[Fetch Error] Vulnerabilidades:", error);
+    return { total: 0, limit: 40, offset: 0, items: [] };
+  }
+}
+
+async function getTendenciaInicial(): Promise<TendenciaMes[]> {
+  try {
+    const res = await fetch(`${API_BASE}/dominios/DNS/vulnerabilidades/tendencia?rango=6m`, {
       cache: "no-store",
     });
     if (!res.ok) return [];
     return await res.json();
   } catch (error) {
-    console.error("[Fetch Error] Vulnerabilidades:", error);
+    console.error("[Fetch Error] Tendencia:", error);
     return [];
   }
 }
@@ -43,10 +57,14 @@ async function getTecnicas(): Promise<Tecnica[]> {
 
 export default async function DnsDashboardPage() {
   // Carga concurrente
-  const [cves, tecnicas] = await Promise.all([
+  const [cvesData, tecnicas, tendenciaInicial] = await Promise.all([
     getVulnerabilidades(),
     getTecnicas(),
+    getTendenciaInicial(),
   ]);
+
+  const cves = cvesData.items;
+  const totalCves = cvesData.total;
 
   // Contar controles y reglas únicos
   const totalControles = new Set(tecnicas.flatMap((t) => t.controles.map((c) => c.codigo))).size;
@@ -60,21 +78,6 @@ export default async function DnsDashboardPage() {
     scoresValidos.length > 0
       ? (scoresValidos.reduce((a, b) => a + b, 0) / scoresValidos.length).toFixed(1)
       : "N/A";
-
-  const getSeverityBadge = (severity: string | null) => {
-    switch (severity?.toUpperCase()) {
-      case "CRITICAL":
-        return "bg-rose-950/80 text-rose-400 border-rose-800/60";
-      case "HIGH":
-        return "bg-amber-950/80 text-amber-400 border-amber-800/60";
-      case "MEDIUM":
-        return "bg-yellow-950/80 text-yellow-400 border-yellow-800/60";
-      case "LOW":
-        return "bg-blue-950/80 text-blue-400 border-blue-800/60";
-      default:
-        return "bg-slate-800 text-slate-400 border-slate-700";
-    }
-  };
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8 md:p-16">
@@ -141,60 +144,18 @@ export default async function DnsDashboardPage() {
         {/* Gráfico de distribución CVSS */}
         <GraficoSeveridad cves={cves} />
 
+        {/* Gráfico de tendencia temporal de CVEs divulgados */}
+        <GraficoTendenciaCVEs apiBase={API_BASE} initialData={tendenciaInicial} />
+
         {/* Matriz MITRE ATT&CK + NIST + Sigma */}
         <SeccionTecnicas tecnicas={tecnicas} />
 
-        {/* Tabla de vulnerabilidades recientes */}
-        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-lg font-bold text-white">Vulnerabilidades Recientes (NVD)</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Ingesta directa de la API de NIST con validación de severidad y contrato CVSS.
-              </p>
-            </div>
-            <span className="text-xs font-mono text-slate-400 bg-slate-950 px-3 py-1 rounded-lg border border-slate-800">
-              {cves.length} registros cargados
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="text-xs font-semibold uppercase text-slate-400 border-b border-slate-800 bg-slate-950/40">
-                <tr>
-                  <th className="py-3 px-4">Identificador</th>
-                  <th className="py-3 px-4">Severidad</th>
-                  <th className="py-3 px-4">Puntaje</th>
-                  <th className="py-3 px-4">Fecha</th>
-                  <th className="py-3 px-4">Descripción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {cves.map((cve) => (
-                  <tr key={cve.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3 px-4 font-mono font-semibold text-indigo-300 whitespace-nowrap">
-                      {cve.id}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`text-xs px-2 py-0.5 rounded-md border font-semibold ${getSeverityBadge(cve.cvss_severity)}`}>
-                        {cve.cvss_severity || "UNKNOWN"}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-mono font-medium">
-                      {cve.cvss_score !== null ? cve.cvss_score.toFixed(1) : "N/A"}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-xs text-slate-400 whitespace-nowrap">
-                      {cve.fecha_publicacion}
-                    </td>
-                    <td className="py-3 px-4 text-xs text-slate-400 max-w-md truncate" title={cve.descripcion}>
-                      {cve.descripcion}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        {/* Tabla de vulnerabilidades recientes con paginación y filas expandibles */}
+        <SeccionVulnerabilidades
+          initialCves={cves}
+          total={totalCves}
+          apiBase={API_BASE}
+        />
       </div>
     </main>
   );

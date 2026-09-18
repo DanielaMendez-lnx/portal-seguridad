@@ -31,3 +31,10 @@ class TecnicaDetalleOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class TendenciaMesOut(BaseModel):
+    mes: str
+    total: int
+
+    class Config:
+        from_attributes = True
