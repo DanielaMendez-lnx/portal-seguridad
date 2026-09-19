@@ -1,8 +1,16 @@
 from sqlalchemy import (
-    Column, Integer, String, Text, Date, Float,
-    ForeignKey, Table, UniqueConstraint
+    Column,
+    Date,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 # ==========================================

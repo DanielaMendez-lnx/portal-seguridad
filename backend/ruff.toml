@@ -1,0 +1,18 @@
+# Configuración de Ruff para el backend de FastAPI
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+]
+ignore = [
+    "E501",  # line length (flexibilidad para URLs largas y mensajes de logs)
+]
+
+[lint.per-file-ignores]
+"alembic/*" = ["F401", "E402", "W291"]  # Configuración estándar de Alembic
+"limpiar_duplicados.py" = ["W291"]     # Script de mantenimiento SQL multilínea

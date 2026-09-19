@@ -1,61 +1,30 @@
-import sys
 import os
+import sys
+
 import requests
 from sqlalchemy.dialects.postgresql import insert
 
 # Permitir importaciones desde la carpeta app y etl
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.database import SessionLocal
-from app.models import Fuente, MarcoNormativo, Control, Tecnica, TecnicaControl
+from app.models import Control, TecnicaControl
+from etl.common import (
+    asegurar_fuente,
+    asegurar_marco_normativo,
+    obtener_ids_tecnicas_locales,
+    sesion_etl,
+)
 from etl.config_fuentes import CONFIG_FUENTES
 
 print(">>> Iniciando script de ingesta oficial de CTID Mappings Explorer...")
 
-def asegurar_entidades_base(db):
-    """Garantiza la existencia de la fuente CTID y el marco NIST SP 800-53 Rev. 5."""
-    meta_fuente = CONFIG_FUENTES["CTID"]
-    stmt_fuente = insert(Fuente).values(
-        nombre=meta_fuente["nombre"],
-        tipo_confianza=meta_fuente["tipo_confianza"],
-        url=meta_fuente["url"],
-        fecha_ultima_actualizacion=meta_fuente["fecha_ultima_actualizacion"]
-    ).on_conflict_do_update(
-        index_elements=["nombre"],
-        set_={
-            "tipo_confianza": meta_fuente["tipo_confianza"],
-            "url": meta_fuente["url"],
-            "fecha_ultima_actualizacion": meta_fuente["fecha_ultima_actualizacion"]
-        }
-    ).returning(Fuente.id)
-    fuente_id = db.execute(stmt_fuente).scalar()
-
-    # Marco normativo NIST SP 800-53 Rev. 5 (utiliza restricción única uq_marco_nombre_version)
-    stmt_marco = insert(MarcoNormativo).values(
-        nombre="NIST SP 800-53",
-        version="Rev. 5"
-    ).on_conflict_do_nothing(
-        index_elements=["nombre", "version"]
-    ).returning(MarcoNormativo.id)
-    marco_id = db.execute(stmt_marco).scalar()
-
-    if not marco_id:
-        marco_id = db.query(MarcoNormativo.id).filter(
-            MarcoNormativo.nombre == "NIST SP 800-53",
-            MarcoNormativo.version == "Rev. 5"
-        ).scalar()
-
-    db.commit()
-    return fuente_id, marco_id
-
 def ejecutar_etl_ctid():
-    db = SessionLocal()
-    try:
+    with sesion_etl() as db:
         print("[*] Sincronizando fuente CTID y marco normativo base en Neon...")
-        fuente_id, marco_id = asegurar_entidades_base(db)
+        fuente_id = asegurar_fuente(db, "CTID")
+        marco_id = asegurar_marco_normativo(db, "NIST SP 800-53", "Rev. 5")
 
-        # Identificar las técnicas registradas en Neon para el cruce
-        tecnicas_locales = set(r[0] for r in db.query(Tecnica.id).all())
+        tecnicas_locales = obtener_ids_tecnicas_locales(db)
         print(f"[*] Base local contiene {len(tecnicas_locales)} técnicas registradas.")
 
         dataset_url = CONFIG_FUENTES["CTID"].get(
@@ -80,11 +49,11 @@ def ejecutar_etl_ctid():
             control_name = item.get("capability_description") or control_code
             status = item.get("status")
 
-            # Filtrar solo mapeos mapeables de técnicas que existen en nuestra base
-            if (tecnica_id in tecnicas_locales 
-                and control_code 
-                and status != "non_mappable"):
-
+            if (
+                tecnica_id in tecnicas_locales
+                and control_code
+                and status != "non_mappable"
+            ):
                 # 1. Upsert del Control normativo en NIST SP 800-53
                 stmt_ctrl = insert(Control).values(
                     codigo=control_code,
@@ -116,15 +85,7 @@ def ejecutar_etl_ctid():
                 db.execute(stmt_rel)
                 mapeos_insertados += 1
 
-        db.commit()
         print(f"[OK] Pipeline CTID finalizado: {mapeos_insertados} mapeos procesados ({len(controles_vistos)} controles normativos únicos vinculados).")
-
-    except Exception as e:
-        db.rollback()
-        print(f"[ERROR] Error durante la ejecución del ETL de CTID: {e}")
-        raise
-    finally:
-        db.close()
 
 if __name__ == "__main__":
     ejecutar_etl_ctid()

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShieldAlert, ShieldCheck, Terminal, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { ShieldCheck, Terminal, Search, ChevronDown, ChevronUp } from "lucide-react";
 
 export interface Control {
   codigo: string;
@@ -126,8 +126,17 @@ export default function SeccionTecnicas({ tecnicas }: Props) {
               >
                 {/* Cabecera de la tarjeta */}
                 <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={expandida}
                   onClick={() => toggleExpandir(t.id)}
-                  className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-800/30 transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      toggleExpandir(t.id);
+                    }
+                  }}
+                  className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-800/30 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/50 rounded-xl"
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-xs font-bold text-indigo-400 bg-indigo-950/50 border border-indigo-800/50 px-2.5 py-1 rounded-md">

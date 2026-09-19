@@ -1,5 +1,7 @@
 from sqlalchemy import text
+
 from app.database import engine
+
 
 def test():
     try:
@@ -15,4 +17,3 @@ def test():
 
 if __name__ == "__main__":
     test()
-    

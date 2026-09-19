@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -26,10 +26,12 @@ export default function GraficoTendenciaCVEs({ apiBase, initialData = [] }: Prop
   const [rango, setRango] = useState<"6m" | "1y">("6m");
   const [datos, setDatos] = useState<TendenciaMes[]>(initialData);
   const [cargando, setCargando] = useState<boolean>(false);
+  const yaCargoInicial = useRef(initialData.length > 0);
 
   useEffect(() => {
-    // Si ya tenemos datos iniciales y el rango es 6m, no volvemos a pedir en el primer render
-    if (rango === "6m" && initialData.length > 0 && datos === initialData) {
+    // Si ya tenemos datos iniciales de SSR en 6m, omitimos la primera llamada redundante
+    if (rango === "6m" && yaCargoInicial.current) {
+      yaCargoInicial.current = false;
       return;
     }
 
@@ -149,7 +151,7 @@ export default function GraficoTendenciaCVEs({ apiBase, initialData = [] }: Prop
                 fontSize: "12px",
               }}
               cursor={{ fill: "rgba(255, 255, 255, 0.05)" }}
-              formatter={(value: any) => [`${value} CVEs divulgados`, "Publicaciones"]}
+              formatter={(value: unknown) => [`${value ?? 0} CVEs divulgados`, "Publicaciones"]}
               labelFormatter={(_, payload) => {
                 const item = payload && payload[0]?.payload;
                 return item ? `Mes oficial: ${item.mesOriginal}` : "";

@@ -1,15 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app.models import Tecnica
-from app.schemas import TecnicaDetalleOut, ControlOut, ReglaOut
+from app.schemas import ControlOut, ReglaOut, TecnicaDetalleOut
 
 router = APIRouter(prefix="/tecnicas", tags=["Técnicas de Detección"])
 
 @router.get("/{tecnica_id}", response_model=TecnicaDetalleOut)
-def obtener_tecnica(tecnica_id: str, db: Session = Depends(get_db)):
+def obtener_tecnica(
+    tecnica_id: str = Path(
+        ...,
+        pattern=r"^T\d{4}(\.\d{3})?$",
+        description="Identificador oficial de técnica MITRE ATT&CK (ej. T1071 o T1071.004)"
+    ),
+    db: Session = Depends(get_db)
+):
     tecnica = db.query(Tecnica).filter(Tecnica.id == tecnica_id).first()
-    
+
     if not tecnica:
         raise HTTPException(status_code=404, detail="Técnica no encontrada")
 

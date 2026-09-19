@@ -1,26 +1,26 @@
-import os
-import sys
-import re
 import hashlib
-import requests
+import os
+import re
+import sys
 import xml.etree.ElementTree as ET
 from datetime import date
 from email.utils import parsedate_to_datetime
+
+import requests
 from sqlalchemy.dialects.postgresql import insert
 
 # Permitir importaciones relativas desde app y etl
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.database import SessionLocal
 from app.models import (
-    Fuente,
     Dominio,
-    Tecnica,
     ReporteAmenaza,
+    Tecnica,
     reporte_dominio,
     tecnica_reporte,
-    vulnerabilidad_dominio
+    vulnerabilidad_dominio,
 )
+from etl.common import asegurar_dominio, asegurar_fuente, sesion_etl
 from etl.config_fuentes import CONFIG_FUENTES
 
 print(">>> Iniciando script de ingesta oficial de CISA Advisories...")
@@ -36,28 +36,6 @@ REGEX_ATTACK_CODE = re.compile(r"\b(T\d{4}(?:\.\d{3})?)\b", re.IGNORECASE)
 
 # Expresión regular para detectar identificadores CVE
 REGEX_CVE = re.compile(r"\b(CVE-\d{4}-\d{4,7})\b", re.IGNORECASE)
-
-
-def asegurar_fuente_cisa(db):
-    """Garantiza la existencia y actualización de la fuente CISA Advisories en Neon."""
-    meta = CONFIG_FUENTES["CISA"]
-    stmt = insert(Fuente).values(
-        nombre=meta["nombre"],
-        tipo_confianza=meta["tipo_confianza"],
-        url=meta["url"],
-        fecha_ultima_actualizacion=meta["fecha_ultima_actualizacion"]
-    ).on_conflict_do_update(
-        index_elements=["nombre"],
-        set_={
-            "tipo_confianza": meta["tipo_confianza"],
-            "url": meta["url"],
-            "fecha_ultima_actualizacion": meta["fecha_ultima_actualizacion"]
-        }
-    ).returning(Fuente.id)
-
-    fuente_id = db.execute(stmt).scalar()
-    db.commit()
-    return fuente_id
 
 
 def extraer_guid_robusto(item, title, pub_date_str):
@@ -91,36 +69,31 @@ def parsear_fecha_rfc822(pub_date_str):
 
 
 def ejecutar_etl_cisa():
-    db = SessionLocal()
-    try:
+    with sesion_etl() as db:
         print("[*] Sincronizando fuente CISA Advisories en Neon...")
-        fuente_id = asegurar_fuente_cisa(db)
+        fuente_id = asegurar_fuente(db, "CISA")
+        dominio_dns_id = asegurar_dominio(db, "DNS")
 
-        # 1. Obtener dominio DNS
-        dom = db.query(Dominio).filter(Dominio.nombre.ilike("DNS")).first()
-        if not dom:
-            raise ValueError("Dominio 'DNS' no encontrado en la base de datos.")
-
-        # 2. Obtener conjunto de técnicas locales asociadas a DNS
+        # 1. Obtener conjunto de técnicas locales asociadas a DNS
         tecnicas_dns = set(
             r[0].upper()
             for r in db.query(Tecnica.id)
             .join(Tecnica.dominios)
-            .filter(Dominio.id == dom.id)
+            .filter(Dominio.id == dominio_dns_id)
             .all()
         )
         print(f"[*] Base local contiene {len(tecnicas_dns)} técnicas registradas para el dominio DNS.")
 
-        # 3. Obtener CVEs locales asociados a DNS para enriquecer el cruce
+        # 2. Obtener CVEs locales asociados a DNS para enriquecer el cruce
         cves_dns = set(
             r[0].upper()
             for r in db.execute(
-                vulnerabilidad_dominio.select().where(vulnerabilidad_dominio.c.dominio_id == dom.id)
+                vulnerabilidad_dominio.select().where(vulnerabilidad_dominio.c.dominio_id == dominio_dns_id)
             ).fetchall()
         )
         print(f"[*] Base local contiene {len(cves_dns)} CVEs asociados a DNS para correlación.")
 
-        # 4. Descargar feed oficial de CISA
+        # 3. Descargar feed oficial de CISA
         feed_url = CONFIG_FUENTES["CISA"].get(
             "feed_url",
             "https://www.cisa.gov/cybersecurity-advisories/all.xml"
@@ -134,66 +107,65 @@ def ejecutar_etl_cisa():
         resp.raise_for_status()
 
         root = ET.fromstring(resp.content)
-        channel = root.find("channel")
-        items = channel.findall("item") if channel is not None else []
-        print(f"[*] Feed parseado exitosamente: {len(items)} boletines/advisories recibidos.")
+        items = root.findall(".//item")
+        print(f"[*] Analizando {len(items)} boletines recibidos en el feed XML...")
 
-        total_procesados = len(items)
+        total_procesados = 0
         calificados_dns = 0
         asociados_tecnica = 0
         vinculos_tecnicas_totales = 0
 
         for item in items:
-            title_elem = item.find("title")
-            pubdate_elem = item.find("pubDate")
-            desc_elem = item.find("description")
+            total_procesados += 1
+            title = (item.findtext("title") or "").strip()
+            description = (item.findtext("description") or "").strip()
+            pub_date_str = (item.findtext("pubDate") or "").strip()
 
-            title = title_elem.text.strip() if title_elem is not None and title_elem.text else "Sin título"
-            pubdate_str = pubdate_elem.text.strip() if pubdate_elem is not None and pubdate_elem.text else ""
-            desc = desc_elem.text.strip() if desc_elem is not None and desc_elem.text else ""
+            fecha_pub = parsear_fecha_rfc822(pub_date_str)
+            fuente_ref_id = extraer_guid_robusto(item, title, pub_date_str)
 
-            guid_ref = extraer_guid_robusto(item, title, pubdate_str)
-            fecha_pub = parsear_fecha_rfc822(pubdate_str)
+            texto_completo = f"{title}\n{description}"
+            cves_mencionados = set(m.upper() for m in REGEX_CVE.findall(texto_completo))
+            hay_cve_dns = any(cve in cves_dns for cve in cves_mencionados)
+            hay_keyword_dns = bool(REGEX_DNS_KEYWORDS.search(texto_completo))
 
-            texto_analisis = f"{title} {desc}"
-
-            # Evaluar coincidencias
-            dns_keywords_found = REGEX_DNS_KEYWORDS.findall(texto_analisis)
-            cves_encontrados = set(c.upper() for c in REGEX_CVE.findall(texto_analisis) if c.upper() in cves_dns)
-            tecnicas_mencionadas = set(t.upper() for t in REGEX_ATTACK_CODE.findall(texto_analisis) if t.upper() in tecnicas_dns)
-
-            califica_para_dns = bool(dns_keywords_found or cves_encontrados or tecnicas_mencionadas)
-
-            if not califica_para_dns:
+            if not (hay_keyword_dns or hay_cve_dns):
                 continue
 
             calificados_dns += 1
 
-            # 1. UPSERT en reportes_amenaza por (fuente_ref_id, fuente_id)
-            stmt_rep = insert(ReporteAmenaza).values(
-                titulo=title[:250],
+            stmt_reporte = insert(ReporteAmenaza).values(
+                titulo=title[:300],
                 fecha_publicacion=fecha_pub,
-                contador_incidencias=1,
                 fuente_id=fuente_id,
-                fuente_ref_id=guid_ref
+                fuente_ref_id=fuente_ref_id,
+                contador_incidencias=1
             ).on_conflict_do_update(
-                index_elements=["fuente_ref_id", "fuente_id"],
+                index_elements=["fuente_id", "fuente_ref_id"],
                 set_={
-                    "titulo": title[:250],
+                    "titulo": title[:300],
                     "fecha_publicacion": fecha_pub
                 }
             ).returning(ReporteAmenaza.id)
 
-            rep_id = db.execute(stmt_rep).scalar()
+            rep_id = db.execute(stmt_reporte).scalar()
+            if not rep_id:
+                rep_id = db.query(ReporteAmenaza.id).filter(
+                    ReporteAmenaza.fuente_id == fuente_id,
+                    ReporteAmenaza.fuente_ref_id == fuente_ref_id
+                ).scalar()
 
-            # 2. Vincular obligatoriamente al Dominio DNS en reporte_dominio
-            stmt_dom = insert(reporte_dominio).values(
+            stmt_rep_dom = insert(reporte_dominio).values(
                 reporte_id=rep_id,
-                dominio_id=dom.id
+                dominio_id=dominio_dns_id
             ).on_conflict_do_nothing()
-            db.execute(stmt_dom)
+            db.execute(stmt_rep_dom)
 
-            # 3. Vincular a técnica_reporte SOLO si se mencionaron técnicas ATT&CK explícitas
+            codigos_raw = REGEX_ATTACK_CODE.findall(texto_completo)
+            tecnicas_mencionadas = set(
+                c.upper() for c in codigos_raw if c.upper() in tecnicas_dns
+            )
+
             if tecnicas_mencionadas:
                 asociados_tecnica += 1
                 for t_id in tecnicas_mencionadas:
@@ -204,20 +176,11 @@ def ejecutar_etl_cisa():
                     db.execute(stmt_tec)
                     vinculos_tecnicas_totales += 1
 
-        db.commit()
-
-        print(f"\n[OK] Pipeline de CISA Advisories finalizado:")
+        print("\n[OK] Pipeline de CISA Advisories finalizado:")
         print(f" - Total boletines procesados en el feed: {total_procesados}")
         print(f" - Boletines calificados para dominio DNS (reporte_dominio): {calificados_dns}")
         print(f" - Boletines que además citaron técnicas ATT&CK explícitas (tecnica_reporte): {asociados_tecnica}")
         print(f" - Vínculos totales creados en tecnica_reporte: {vinculos_tecnicas_totales}")
-
-    except Exception as e:
-        db.rollback()
-        print(f"[ERROR] Error durante el ETL de CISA: {e}")
-        raise
-    finally:
-        db.close()
 
 
 if __name__ == "__main__":

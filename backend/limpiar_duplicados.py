@@ -1,5 +1,7 @@
-from app.database import SessionLocal
 from sqlalchemy import text
+
+from app.database import SessionLocal
+
 
 def ejecutar_limpieza():
     db = SessionLocal()

@@ -1,9 +1,17 @@
 from datetime import date
+
 from app.database import SessionLocal
 from app.models import (
-    Dominio, MarcoNormativo, Fuente, Tecnica, 
-    Control, TecnicaControl, ReglaDeteccion, ReporteAmenaza
+    Control,
+    Dominio,
+    Fuente,
+    MarcoNormativo,
+    ReglaDeteccion,
+    ReporteAmenaza,
+    Tecnica,
+    TecnicaControl,
 )
+
 
 def sembrar_datos():
     db = SessionLocal()
@@ -99,4 +107,3 @@ def sembrar_datos():
 
 if __name__ == "__main__":
     sembrar_datos()
-    

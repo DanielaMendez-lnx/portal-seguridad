@@ -1,15 +1,17 @@
 
-import os
 import logging
+import os
 import traceback
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
-from app.routers import tecnicas, dominios
+from slowapi.middleware import SlowAPIMiddleware
+
+from app.routers import dominios, tecnicas
 
 load_dotenv()
 

@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { Globe, Shield, Key, ArrowRight, ArrowLeft } from "lucide-react";
+import { Globe, Key, ArrowRight, ArrowLeft } from "lucide-react";
 
 export default function DominiosCatalogPage() {
   return (

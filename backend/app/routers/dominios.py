@@ -1,13 +1,15 @@
 
 
-from typing import List, Optional
 from datetime import date, timedelta
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
-from sqlalchemy.orm import Session, selectinload, joinedload
 from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session, selectinload
+
 from app.database import get_db
-from app.models import Dominio, Vulnerabilidad, Tecnica, TecnicaControl, Control
+from app.models import Control, Dominio, Tecnica, TecnicaControl, Vulnerabilidad
 from app.schemas import TendenciaMesOut
 
 router = APIRouter(prefix="/dominios", tags=["Dominios & Métricas"])
@@ -73,6 +75,17 @@ def listar_vulnerabilidades_por_dominio(
         ],
     }
 
+def calcular_meses_esperados(referencia: date, cant_meses: int) -> List[str]:
+    """Genera lista cronológica de meses en formato YYYY-MM hacia atrás desde una fecha."""
+    curr = date(referencia.year, referencia.month, 1)
+    meses = []
+    for _ in range(cant_meses):
+        meses.append(curr.strftime("%Y-%m"))
+        ultimo_dia_ant = curr - timedelta(days=1)
+        curr = date(ultimo_dia_ant.year, ultimo_dia_ant.month, 1)
+    meses.reverse()
+    return meses
+
 # 2. Endpoint de Tendencia de Vulnerabilidades por Mes
 @router.get("/{nombre}/vulnerabilidades/tendencia", response_model=List[TendenciaMesOut])
 def obtener_tendencia_vulnerabilidades(
@@ -85,15 +98,7 @@ def obtener_tendencia_vulnerabilidades(
         raise HTTPException(status_code=404, detail="Dominio no encontrado")
 
     cant_meses = 6 if rango == "6m" else 12
-    hoy = date.today()
-    curr = date(hoy.year, hoy.month, 1)
-
-    meses_esperados = []
-    for _ in range(cant_meses):
-        meses_esperados.append(curr.strftime("%Y-%m"))
-        ultimo_dia_ant = curr - timedelta(days=1)
-        curr = date(ultimo_dia_ant.year, ultimo_dia_ant.month, 1)
-    meses_esperados.reverse()
+    meses_esperados = calcular_meses_esperados(date.today(), cant_meses)
 
     primer_mes_str = meses_esperados[0]
     y_ini, m_ini = map(int, primer_mes_str.split("-"))

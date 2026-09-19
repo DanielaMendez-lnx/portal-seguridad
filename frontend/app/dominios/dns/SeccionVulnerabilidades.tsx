@@ -100,8 +100,17 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
                 <Fragment key={cve.id}>
                   {/* Fila Colapsada / Principal */}
                   <tr
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={expandido}
                     onClick={() => toggleExpandir(cve.id)}
-                    className={`cursor-pointer transition-colors ${
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleExpandir(cve.id);
+                      }
+                    }}
+                    className={`cursor-pointer transition-colors focus:outline-none focus:bg-slate-800/80 ${
                       expandido ? "bg-slate-800/60" : "hover:bg-slate-800/40"
                     }`}
                   >

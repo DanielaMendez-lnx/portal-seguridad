@@ -1,18 +1,19 @@
 
-import sys
-import os
-import time
 import argparse
-import requests
+import os
+import sys
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+import requests
 from pydantic import BaseModel, Field
 from sqlalchemy.dialects.postgresql import insert
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.database import SessionLocal
-from app.models import Fuente, Dominio, Vulnerabilidad, vulnerabilidad_dominio
+from app.models import Vulnerabilidad, vulnerabilidad_dominio
+from etl.common import asegurar_dominio, asegurar_fuente, sesion_etl
 from etl.config_fuentes import CONFIG_FUENTES
 
 # ==============================================================================
@@ -90,43 +91,15 @@ def formatear_fecha_nvd(dt: datetime) -> str:
 
 
 # ==============================================================================
-# 3. ENTIDADES BASE (Fuente y Dominio)
-# ==============================================================================
-
-def asegurar_entidades_base(db):
-    meta_fuente = CONFIG_FUENTES["NVD"]
-    stmt_fuente = insert(Fuente).values(
-        nombre=meta_fuente["nombre"],
-        tipo_confianza=meta_fuente["tipo_confianza"],
-        url=meta_fuente["url"],
-        fecha_ultima_actualizacion=meta_fuente["fecha_ultima_actualizacion"],
-    ).on_conflict_do_update(
-        index_elements=["nombre"],
-        set_={"fecha_ultima_actualizacion": meta_fuente["fecha_ultima_actualizacion"]},
-    ).returning(Fuente.id)
-
-    fuente_id = db.execute(stmt_fuente).scalar()
-
-    stmt_dominio = insert(Dominio).values(nombre="DNS").on_conflict_do_nothing().returning(Dominio.id)
-    dominio_id = db.execute(stmt_dominio).scalar()
-
-    if not dominio_id:
-        dominio_id = db.query(Dominio.id).filter(Dominio.nombre == "DNS").scalar()
-
-    db.commit()
-    return fuente_id, dominio_id
-
-
-# ==============================================================================
-# 4. LÓGICA DE INGESTA Y PERSISTENCIA (UPSERT)
+# 3. LÓGICA DE INGESTA Y PERSISTENCIA (UPSERT)
 # ==============================================================================
 
 def ejecutar_etl_nvd(modo: str = "incremental"):
-    db = SessionLocal()
-    try:
+    with sesion_etl() as db:
         print(f"[*] Modo de ejecución: {modo}")
-        print("[*] Sincronizando fuente NVD y dominio DNS...")
-        fuente_id, dominio_id = asegurar_entidades_base(db)
+        print("[*] Sincronizando fuente NVD y dominio DNS en Neon...")
+        fuente_id = asegurar_fuente(db, "NVD")
+        dominio_id = asegurar_dominio(db, "DNS")
 
         api_url = CONFIG_FUENTES["NVD"]["url"]
         api_key = os.getenv("NVD_API_KEY")
@@ -236,14 +209,7 @@ def ejecutar_etl_nvd(modo: str = "incremental"):
                 print(f"[!] Error procesando CVE {cve_validado.cve_id}: {item_err}")
                 continue
 
-        db.commit()
         print(f"[OK] Pipeline NVD finalizado: {cves_insertados} CVEs persistidos y asociados al dominio DNS.")
-
-    except Exception as e:
-        db.rollback()
-        print(f"[ERROR] Error en ETL NVD: {e}")
-    finally:
-        db.close()
 
 
 if __name__ == "__main__":
