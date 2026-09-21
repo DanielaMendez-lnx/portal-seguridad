@@ -44,15 +44,15 @@ export default function GraficoSeveridad({ cves }: Props) {
     { name: "Crítica", count: conteo.CRITICAL, color: "#f43f5e" }, // rose-500
     { name: "Alta", count: conteo.HIGH, color: "#f59e0b" },        // amber-500
     { name: "Media", count: conteo.MEDIUM, color: "#eab308" },      // yellow-500
-    { name: "Baja", count: conteo.LOW, color: "#3b82f6" },         // blue-500
-    { name: "Desconocida", count: conteo.UNKNOWN, color: "#64748b" }, // slate-500
+    { name: "Baja", count: conteo.LOW, color: "#3d7bff" },         // umbra-blue
+    { name: "Desconocida", count: conteo.UNKNOWN, color: "#4d5568" }, // umbra-ink-muted
   ];
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-10">
+    <div className="bg-umbra-surface border border-umbra-line rounded-2xl p-6 mb-10">
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-white">Perfil de Severidad (CVSS v3.x / v4.0)</h2>
-        <p className="text-xs text-slate-400 mt-0.5">
+        <h2 className="text-lg font-bold text-umbra-ink">Perfil de Severidad (CVSS v3.x / v4.0)</h2>
+        <p className="text-xs text-umbra-ink-dim mt-0.5">
           Distribución cuantitativa de las amenazas según su nivel de impacto operacional.
         </p>
       </div>
@@ -62,13 +62,13 @@ export default function GraficoSeveridad({ cves }: Props) {
           <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <XAxis
               dataKey="name"
-              stroke="#64748b"
+              stroke="#8b95ac"
               fontSize={12}
               tickLine={false}
               axisLine={false}
             />
             <YAxis
-              stroke="#64748b"
+              stroke="#8b95ac"
               fontSize={12}
               tickLine={false}
               axisLine={false}
@@ -76,13 +76,14 @@ export default function GraficoSeveridad({ cves }: Props) {
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#020617",
-                borderColor: "#1e293b",
+                backgroundColor: "#070a10",
+                borderColor: "rgba(255, 255, 255, 0.1)",
                 borderRadius: "0.75rem",
-                color: "#f8fafc",
+                color: "#f2f5fa",
                 fontSize: "12px",
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
               }}
-              cursor={{ fill: "rgba(255, 255, 255, 0.05)" }}
+              cursor={{ fill: "rgba(79, 216, 255, 0.06)" }}
             />
             <Bar dataKey="count" radius={[6, 6, 0, 0]}>
               {data.map((entry, index) => (

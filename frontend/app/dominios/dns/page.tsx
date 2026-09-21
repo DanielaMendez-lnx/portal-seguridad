@@ -80,27 +80,27 @@ export default async function DnsDashboardPage() {
       : "N/A";
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-8 md:p-16">
+    <main className="min-h-screen bg-umbra-bg text-umbra-ink p-8 md:p-16">
       <div className="max-w-6xl mx-auto">
         <Link
           href="/dominios"
-          className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 mb-8 transition-colors"
+          className="inline-flex items-center gap-2 text-sm text-umbra-ink-dim hover:text-umbra-ink mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Volver al Catálogo
         </Link>
 
         {/* Encabezado */}
-        <header className="mb-10 pb-8 border-b border-slate-800">
+        <header className="mb-10 pb-8 border-b border-umbra-line">
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-umbra-ink">
               Dominio: Domain Name System (DNS)
             </h1>
             <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800/60 rounded-full">
               En Producción
             </span>
           </div>
-          <p className="text-slate-400 max-w-3xl">
+          <p className="text-umbra-ink-dim max-w-3xl">
             Correlación analítica entre técnicas de ataque MITRE ATT&CK, marcos de mitigación NIST,
             reglas de detección y vulnerabilidades NVD.
           </p>
@@ -108,36 +108,36 @@ export default async function DnsDashboardPage() {
 
         {/* Contadores dinámicos */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
+          <div className="bg-umbra-surface border border-umbra-line p-5 rounded-xl">
+            <div className="flex items-center justify-between text-umbra-ink-dim mb-2">
               <span className="text-xs font-medium uppercase tracking-wider">Técnicas ATT&CK</span>
-              <Activity className="w-4 h-4 text-indigo-400" />
+              <Activity className="w-4 h-4 text-umbra-cyan" />
             </div>
-            <p className="text-2xl font-bold text-white">{tecnicas.length}</p>
+            <p className="text-2xl font-bold text-umbra-ink">{tecnicas.length}</p>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
+          <div className="bg-umbra-surface border border-umbra-line p-5 rounded-xl">
+            <div className="flex items-center justify-between text-umbra-ink-dim mb-2">
               <span className="text-xs font-medium uppercase tracking-wider">Controles NIST</span>
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
             </div>
-            <p className="text-2xl font-bold text-white">{totalControles}</p>
+            <p className="text-2xl font-bold text-umbra-ink">{totalControles}</p>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
+          <div className="bg-umbra-surface border border-umbra-line p-5 rounded-xl">
+            <div className="flex items-center justify-between text-umbra-ink-dim mb-2">
               <span className="text-xs font-medium uppercase tracking-wider">Reglas Sigma</span>
-              <ShieldAlert className="w-4 h-4 text-cyan-400" />
+              <ShieldAlert className="w-4 h-4 text-umbra-cyan" />
             </div>
-            <p className="text-2xl font-bold text-white">{totalReglas}</p>
+            <p className="text-2xl font-bold text-umbra-ink">{totalReglas}</p>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
+          <div className="bg-umbra-surface border border-umbra-line p-5 rounded-xl">
+            <div className="flex items-center justify-between text-umbra-ink-dim mb-2">
               <span className="text-xs font-medium uppercase tracking-wider">CVSS Promedio</span>
               <AlertTriangle className="w-4 h-4 text-amber-400" />
             </div>
-            <p className="text-2xl font-bold text-white">{promedioCvss}</p>
+            <p className="text-2xl font-bold text-umbra-ink">{promedioCvss}</p>
           </div>
         </div>
 

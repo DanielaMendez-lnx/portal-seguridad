@@ -35,7 +35,7 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
       case "LOW":
         return "bg-blue-950/80 text-blue-400 border-blue-800/60";
       default:
-        return "bg-slate-800 text-slate-400 border-slate-700";
+        return "bg-umbra-surface text-umbra-ink-dim border-umbra-line";
     }
   };
 
@@ -69,22 +69,22 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
   };
 
   return (
-    <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+    <section className="bg-umbra-surface border border-umbra-line rounded-2xl p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h2 className="text-lg font-bold text-white">Vulnerabilidades Recientes (NVD)</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h2 className="text-lg font-bold text-umbra-ink">Vulnerabilidades Recientes (NVD)</h2>
+          <p className="text-xs text-umbra-ink-dim mt-0.5">
             Ingesta directa de la API de NIST con validación de severidad y contrato CVSS.
           </p>
         </div>
-        <span className="text-xs font-mono text-slate-400 bg-slate-950 px-3 py-1 rounded-lg border border-slate-800">
+        <span className="text-xs font-mono text-umbra-ink-dim bg-umbra-bg px-3 py-1 rounded-lg border border-umbra-line">
           {cves.length} de {totalCves} cargados
         </span>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm text-slate-300">
-          <thead className="text-xs font-semibold uppercase text-slate-400 border-b border-slate-800 bg-slate-950/40">
+        <table className="w-full text-left text-sm text-umbra-ink">
+          <thead className="text-xs font-semibold uppercase text-umbra-ink-dim border-b border-umbra-line bg-umbra-bg/40">
             <tr>
               <th className="py-3 px-4">Identificador</th>
               <th className="py-3 px-4">Severidad</th>
@@ -93,7 +93,7 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
               <th className="py-3 px-4">Descripción</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60">
+          <tbody className="divide-y divide-umbra-line">
             {cves.map((cve) => {
               const expandido = cveExpandido === cve.id;
               return (
@@ -110,16 +110,16 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
                         toggleExpandir(cve.id);
                       }
                     }}
-                    className={`cursor-pointer transition-colors focus:outline-none focus:bg-slate-800/80 ${
-                      expandido ? "bg-slate-800/60" : "hover:bg-slate-800/40"
+                    className={`cursor-pointer transition-colors focus:outline-none focus:bg-umbra-surface-hover/80 ${
+                      expandido ? "bg-umbra-surface-hover/60" : "hover:bg-umbra-surface-hover/40"
                     }`}
                   >
-                    <td className="py-3 px-4 font-mono font-semibold text-indigo-300 whitespace-nowrap">
+                    <td className="py-3 px-4 font-mono font-semibold text-umbra-cyan whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         {expandido ? (
-                          <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" />
+                          <ChevronUp className="w-4 h-4 text-umbra-ink-dim shrink-0" />
                         ) : (
-                          <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                          <ChevronDown className="w-4 h-4 text-umbra-ink-dim shrink-0" />
                         )}
                         <span>{cve.id}</span>
                       </div>
@@ -136,32 +136,32 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
                     <td className="py-3 px-4 font-mono font-medium">
                       {cve.cvss_score !== null ? cve.cvss_score.toFixed(1) : "N/A"}
                     </td>
-                    <td className="py-3 px-4 font-mono text-xs text-slate-400 whitespace-nowrap">
+                    <td className="py-3 px-4 font-mono text-xs text-umbra-ink-dim whitespace-nowrap">
                       {cve.fecha_publicacion}
                     </td>
-                    <td className="py-3 px-4 text-xs text-slate-400 max-w-md truncate" title={cve.descripcion}>
+                    <td className="py-3 px-4 text-xs text-umbra-ink-dim max-w-md truncate" title={cve.descripcion}>
                       {cve.descripcion}
                     </td>
                   </tr>
 
                   {/* Fila Expandida con vista detallada */}
                   {expandido && (
-                    <tr className="bg-slate-950/70 border-b border-slate-800/80">
+                    <tr className="bg-umbra-bg/70 border-b border-umbra-line">
                       <td colSpan={5} className="p-4 md:p-6">
                         <div className="space-y-4">
                           <div>
-                            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                            <h4 className="text-xs font-semibold uppercase tracking-wider text-umbra-ink-dim mb-1">
                               Descripción Completa
                             </h4>
-                            <p className="text-xs text-slate-300 leading-relaxed">
+                            <p className="text-xs text-umbra-ink leading-relaxed">
                               {cve.descripcion}
                             </p>
                           </div>
 
-                          <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-800/60 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-umbra-line text-xs">
                             <div className="flex flex-wrap items-center gap-6">
                               <div>
-                                <span className="text-slate-500 mr-1.5">Severidad CVSS:</span>
+                                <span className="text-umbra-ink-muted mr-1.5">Severidad CVSS:</span>
                                 <span
                                   className={`px-2 py-0.5 rounded-md border font-semibold ${getSeverityBadge(
                                     cve.cvss_severity
@@ -171,14 +171,14 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
                                 </span>
                               </div>
                               <div>
-                                <span className="text-slate-500 mr-1.5">Puntaje Base:</span>
-                                <span className="font-mono font-bold text-white">
+                                <span className="text-umbra-ink-muted mr-1.5">Puntaje Base:</span>
+                                <span className="font-mono font-bold text-umbra-ink">
                                   {cve.cvss_score !== null ? cve.cvss_score.toFixed(1) : "N/A"}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-slate-500 mr-1.5">Fecha Publicación:</span>
-                                <span className="font-mono text-slate-300">
+                                <span className="text-umbra-ink-muted mr-1.5">Fecha Publicación:</span>
+                                <span className="font-mono text-umbra-ink-dim">
                                   {cve.fecha_publicacion}
                                 </span>
                               </div>
@@ -189,7 +189,7 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 hover:underline transition-colors shrink-0"
+                              className="inline-flex items-center gap-1.5 text-xs text-umbra-cyan hover:text-umbra-cyan/80 hover:underline transition-colors shrink-0"
                             >
                               <span>Ver ficha oficial en NIST NVD</span>
                               <ExternalLink className="w-3.5 h-3.5" />
@@ -212,11 +212,11 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
           <button
             onClick={cargarMas}
             disabled={cargando}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-umbra-surface hover:bg-umbra-surface-hover text-umbra-ink border border-umbra-line disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
           >
             {cargando ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                <Loader2 className="w-4 h-4 animate-spin text-umbra-cyan" />
                 <span>Cargando más registros...</span>
               </>
             ) : (
@@ -225,7 +225,7 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
           </button>
         ) : (
           totalCves > 0 && (
-            <p className="text-xs text-slate-500 text-center py-2">
+            <p className="text-xs text-umbra-ink-muted text-center py-2">
               Se han cargado todas las vulnerabilidades registradas ({totalCves} de {totalCves}).
             </p>
           )
