@@ -36,3 +36,8 @@ async def test_validacion_formato_tecnica_valida_existente():
         assert "reglas" in data
         assert isinstance(data["controles"], list)
         assert isinstance(data["reglas"], list)
+        assert len(data["reglas"]) > 0
+        for r in data["reglas"]:
+            assert "url_fuente" in r
+            assert "id" in r
+            assert "nombre" in r

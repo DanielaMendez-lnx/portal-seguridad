@@ -141,7 +141,12 @@ class ReglaDeteccion(Base):
     nombre = Column(String(200), nullable=False)
     formato = Column(String(30), nullable=False)
     log_source = Column(String(100), nullable=True)
+    url_fuente = Column(String(500), nullable=True)
     fuente_id = Column(Integer, ForeignKey("fuentes.id", ondelete="RESTRICT"), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("url_fuente", name="uq_reglas_deteccion_url_fuente"),
+    )
 
     fuente = relationship("Fuente", back_populates="reglas")
     tecnicas = relationship("Tecnica", secondary=tecnica_regla, back_populates="reglas")

@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { ShieldCheck, Terminal, Search, ChevronDown, ChevronUp } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 export interface Control {
   codigo: string;
@@ -18,6 +19,7 @@ export interface Regla {
   nombre: string;
   formato: string;
   log_source: string | null;
+  url_fuente?: string | null;
 }
 
 export interface Tecnica {
@@ -31,6 +33,14 @@ export interface Tecnica {
 
 interface Props {
   tecnicas: Tecnica[];
+}
+
+function limpiarDescripcionMitre(texto: string): string {
+  return texto
+    .replace(/\s*\(Citation:[^)]+\)/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+\./g, ".")
+    .trim();
 }
 
 export default function SeccionTecnicas({ tecnicas }: Props) {
@@ -177,9 +187,35 @@ export default function SeccionTecnicas({ tecnicas }: Props) {
                 {expandida && (
                   <div className="p-4 pt-0 border-t border-umbra-line space-y-4 mt-2">
                     {t.descripcion && (
-                      <p className="text-xs text-umbra-ink-dim leading-relaxed pt-2">
-                        {t.descripcion}
-                      </p>
+                      <div className="text-xs text-umbra-ink-dim leading-relaxed pt-2">
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                            a: ({ href, children }) => (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-umbra-cyan hover:underline underline-offset-2 font-medium transition-colors"
+                              >
+                                {children}
+                              </a>
+                            ),
+                            strong: ({ children }) => <strong className="text-umbra-ink font-semibold">{children}</strong>,
+                            code: ({ children }) => (
+                              <code className="font-mono text-[11px] bg-umbra-bg text-umbra-cyan px-1.5 py-0.5 rounded border border-umbra-line">
+                                {children}
+                              </code>
+                            ),
+                            ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 mb-2">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1 mb-2">{children}</ol>,
+                            li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                          }}
+                        >
+                          {limpiarDescripcionMitre(t.descripcion)}
+                        </ReactMarkdown>
+                      </div>
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -246,11 +282,27 @@ export default function SeccionTecnicas({ tecnicas }: Props) {
                         ) : (
                           <ul className="space-y-1.5">
                             {t.reglas.map((r) => (
-                              <li key={r.id} className="text-xs text-umbra-ink flex items-start justify-between gap-2">
-                                <span>{r.nombre}</span>
-                                <span className="font-mono text-[10px] text-umbra-cyan bg-umbra-cyan/10 border border-umbra-cyan/30 px-1.5 py-0.5 rounded">
-                                  {r.formato}
-                                </span>
+                              <li
+                                key={r.id}
+                                className="text-xs text-umbra-ink flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-1.5 rounded hover:bg-umbra-surface-hover/60 transition-colors"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-mono text-[10px] text-umbra-cyan bg-umbra-cyan/10 border border-umbra-cyan/30 px-1.5 py-0.5 rounded shrink-0">
+                                    {r.formato}
+                                  </span>
+                                  <span className="leading-snug truncate" title={r.nombre}>{r.nombre}</span>
+                                </div>
+                                {r.url_fuente && (
+                                  <a
+                                    href={r.url_fuente}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-[11px] text-umbra-cyan hover:underline shrink-0 inline-flex items-center gap-1 font-medium transition-colors"
+                                  >
+                                    Ver regla completa ↗
+                                  </a>
+                                )}
                               </li>
                             ))}
                           </ul>

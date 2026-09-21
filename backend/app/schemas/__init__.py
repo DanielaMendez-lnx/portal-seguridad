@@ -18,7 +18,8 @@ class ReglaOut(BaseModel):
     id: int
     nombre: str
     formato: str
-    log_source: Optional[str]
+    log_source: Optional[str] = None
+    url_fuente: Optional[str] = None
 
     class Config:
         from_attributes = True

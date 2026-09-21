@@ -40,6 +40,19 @@ def formatear_log_source(logsource_dict):
     res = " / ".join(parts) if parts else str(category or "generic")
     return res[:100]
 
+def normalizar_ruta_sigma(filename: str) -> str:
+    """Garantiza que la ruta relativa dentro del repositorio sea exacta.
+
+    - Si la ruta ya comienza directamente con una carpeta de reglas (ej. 'rules/...',
+      'rules-emerging-threats/...'), se preserva intacta.
+    - Si proviene de un zipball de GitHub que antepone el nombre del repositorio
+      (ej. 'sigma-master/...', 'sigma-main/...'), se descarta únicamente ese prefijo específico.
+    """
+    parts = filename.split("/", 1)
+    if len(parts) > 1 and parts[0].startswith("sigma-"):
+        return parts[1]
+    return filename
+
 def ejecutar_etl_sigma():
     with sesion_etl() as db:
         print("[*] Sincronizando fuente SigmaHQ en Neon...")
@@ -60,6 +73,7 @@ def ejecutar_etl_sigma():
         zf = zipfile.ZipFile(io.BytesIO(resp.content))
 
         reglas_insertadas = 0
+        reglas_actualizadas = 0
         vinculos_creados = 0
         tecnicas_cubiertas = set()
 
@@ -91,6 +105,8 @@ def ejecutar_etl_sigma():
 
                 nombre_regla = rule_data.get("title", filename.split("/")[-1])
                 log_source = formatear_log_source(rule_data.get("logsource", {}))
+                rel_path = normalizar_ruta_sigma(filename)
+                url_fuente = f"https://github.com/SigmaHQ/sigma/blob/master/{rel_path}"
 
                 regla = db.query(ReglaDeteccion).filter(ReglaDeteccion.nombre == nombre_regla).first()
                 if not regla:
@@ -98,11 +114,16 @@ def ejecutar_etl_sigma():
                         nombre=nombre_regla,
                         formato="Sigma",
                         log_source=log_source,
+                        url_fuente=url_fuente,
                         fuente_id=fuente_id
                     )
                     db.add(regla)
                     db.flush()
                     reglas_insertadas += 1
+                else:
+                    if regla.url_fuente != url_fuente:
+                        regla.url_fuente = url_fuente
+                        reglas_actualizadas += 1
 
                 for t_id in tecnicas_coincidentes:
                     stmt_rel = insert(tecnica_regla).values(
@@ -116,7 +137,7 @@ def ejecutar_etl_sigma():
             except Exception:
                 continue
 
-        print(f"[OK] Pipeline Sigma finalizado: {reglas_insertadas} reglas nuevas creadas, {vinculos_creados} vínculos establecidos.")
+        print(f"[OK] Pipeline Sigma finalizado: {reglas_insertadas} reglas nuevas creadas, {reglas_actualizadas} reglas actualizadas con URL, {vinculos_creados} vínculos establecidos.")
         print(f"[*] Cobertura defensiva: {len(tecnicas_cubiertas)}/{len(tecnicas_locales)} técnicas DNS cuentan con reglas de detección activas.")
 
 if __name__ == "__main__":

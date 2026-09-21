@@ -82,6 +82,7 @@ def sembrar_datos():
             nombre="Suspicious High Volume DNS TXT Queries",
             formato="Sigma",
             log_source="dns_query_logs",
+            url_fuente="https://github.com/SigmaHQ/sigma/blob/master/rules/network/dns/net_dns_susp_txt_query.yml",
             fuente_id=sigma_src.id,
             tecnicas=[t1071_004]
         )

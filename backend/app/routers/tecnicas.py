@@ -43,7 +43,8 @@ def obtener_tecnica(
             id=r.id,
             nombre=r.nombre,
             formato=r.formato,
-            log_source=r.log_source
+            log_source=r.log_source,
+            url_fuente=r.url_fuente,
         )
         for r in tecnica.reglas
     ]

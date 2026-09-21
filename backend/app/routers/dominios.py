@@ -170,7 +170,8 @@ def listar_tecnicas_por_dominio(nombre: str, db: Session = Depends(get_db)):
                     "id": r.id,
                     "nombre": r.nombre,
                     "formato": r.formato,
-                    "log_source": r.log_source
+                    "log_source": r.log_source,
+                    "url_fuente": r.url_fuente,
                 }
                 for r in t.reglas
             ]
