@@ -1,4 +1,4 @@
-
+export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { ArrowLeft, ShieldAlert, AlertTriangle, ShieldCheck, Activity } from "lucide-react";
@@ -14,7 +14,7 @@ interface VulnerabilidadesResponse {
   items: Vulnerabilidad[];
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 async function getVulnerabilidades(): Promise<VulnerabilidadesResponse> {
   try {
