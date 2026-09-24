@@ -2,8 +2,9 @@
 "use client";
 
 import { useState } from "react";
-import { ShieldCheck, Terminal, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { ShieldCheck, Terminal, Search, ChevronDown, ChevronUp, Star } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { useFavoritos } from "../../hooks/useFavoritos";
 
 export interface Control {
   codigo: string;
@@ -33,6 +34,8 @@ export interface Tecnica {
 
 interface Props {
   tecnicas: Tecnica[];
+  dominioCodigo?: string;
+  dominioNombre?: string;
 }
 
 function limpiarDescripcionMitre(texto: string): string {
@@ -43,7 +46,12 @@ function limpiarDescripcionMitre(texto: string): string {
     .trim();
 }
 
-export default function SeccionTecnicas({ tecnicas }: Props) {
+export default function SeccionTecnicas({
+  tecnicas,
+  dominioCodigo = "DNS",
+  dominioNombre = "Domain Name System (DNS)",
+}: Props) {
+  const { esFavorito, toggleFavorito } = useFavoritos();
   const [busqueda, setBusqueda] = useState("");
   const [tacticaSeleccionada, setTacticaSeleccionada] = useState("TODAS");
   const [tecnicaExpandida, setTecnicaExpandida] = useState<string | null>(null);
@@ -281,30 +289,72 @@ export default function SeccionTecnicas({ tecnicas }: Props) {
                           <p className="text-xs text-umbra-ink-muted">Sin reglas específicas registradas.</p>
                         ) : (
                           <ul className="space-y-1.5">
-                            {t.reglas.map((r) => (
-                              <li
-                                key={r.id}
-                                className="text-xs text-umbra-ink flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-1.5 rounded hover:bg-umbra-surface-hover/60 transition-colors"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="font-mono text-[10px] text-umbra-cyan bg-umbra-cyan/10 border border-umbra-cyan/30 px-1.5 py-0.5 rounded shrink-0">
-                                    {r.formato}
-                                  </span>
-                                  <span className="leading-snug truncate" title={r.nombre}>{r.nombre}</span>
-                                </div>
-                                {r.url_fuente && (
-                                  <a
-                                    href={r.url_fuente}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="text-[11px] text-umbra-cyan hover:underline shrink-0 inline-flex items-center gap-1 font-medium transition-colors"
-                                  >
-                                    Ver regla completa ↗
-                                  </a>
-                                )}
-                              </li>
-                            ))}
+                            {t.reglas.map((r) => {
+                              const favorita = esFavorito(r.id, t.id);
+                              return (
+                                <li
+                                  key={r.id}
+                                  className="text-xs text-umbra-ink flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-1.5 rounded hover:bg-umbra-surface-hover/60 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {/* Botón de Estrella contextual: Regla + Técnica + Dominio */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleFavorito({
+                                          regla_id: r.id,
+                                          regla_nombre: r.nombre,
+                                          regla_formato: r.formato,
+                                          url_fuente: r.url_fuente ?? null,
+                                          tecnica_id: t.id,
+                                          tecnica_nombre: t.nombre,
+                                          dominio_codigo: dominioCodigo,
+                                          dominio_nombre: dominioNombre,
+                                        });
+                                      }}
+                                      className={`p-1 rounded-md transition-colors shrink-0 focus:outline-none focus:ring-1 focus:ring-amber-400/50 ${
+                                        favorita
+                                          ? "text-amber-400 hover:text-amber-300"
+                                          : "text-umbra-ink-muted hover:text-amber-300 hover:bg-umbra-surface"
+                                      }`}
+                                      title={
+                                        favorita
+                                          ? `Quitar regla de repertorio (${t.id})`
+                                          : `Guardar regla en repertorio (${t.id})`
+                                      }
+                                      aria-label={
+                                        favorita
+                                          ? `Quitar ${r.nombre} de favoritos en técnica ${t.id}`
+                                          : `Guardar ${r.nombre} en favoritos en técnica ${t.id}`
+                                      }
+                                    >
+                                      <Star
+                                        className={`w-3.5 h-3.5 transition-transform active:scale-125 ${
+                                          favorita ? "fill-amber-400 stroke-amber-400" : "stroke-current fill-none"
+                                        }`}
+                                      />
+                                    </button>
+
+                                    <span className="font-mono text-[10px] text-umbra-cyan bg-umbra-cyan/10 border border-umbra-cyan/30 px-1.5 py-0.5 rounded shrink-0">
+                                      {r.formato}
+                                    </span>
+                                    <span className="leading-snug truncate" title={r.nombre}>{r.nombre}</span>
+                                  </div>
+                                  {r.url_fuente && (
+                                    <a
+                                      href={r.url_fuente}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-[11px] text-umbra-cyan hover:underline shrink-0 inline-flex items-center gap-1 font-medium transition-colors"
+                                    >
+                                      Ver regla completa ↗
+                                    </a>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ul>
                         )}
                       </div>

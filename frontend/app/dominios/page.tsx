@@ -6,13 +6,21 @@ export default function DominiosCatalogPage() {
   return (
     <main className="min-h-screen bg-umbra-bg text-umbra-ink p-8 md:p-16">
       <div className="max-w-5xl mx-auto">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-sm text-umbra-ink-dim hover:text-umbra-ink mb-8 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Volver al Inicio
-        </Link>
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-umbra-ink-dim hover:text-umbra-ink transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver al Inicio
+          </Link>
+          <Link
+            href="/repertorio"
+            className="inline-flex items-center gap-1.5 text-xs text-umbra-cyan hover:underline transition-colors font-medium"
+          >
+            Ver Repertorio de Reglas →
+          </Link>
+        </div>
 
         <header className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-umbra-ink mb-2">

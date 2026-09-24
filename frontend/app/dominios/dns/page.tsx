@@ -82,13 +82,21 @@ export default async function DnsDashboardPage() {
   return (
     <main className="min-h-screen bg-umbra-bg text-umbra-ink p-8 md:p-16">
       <div className="max-w-6xl mx-auto">
-        <Link
-          href="/dominios"
-          className="inline-flex items-center gap-2 text-sm text-umbra-ink-dim hover:text-umbra-ink mb-8 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Volver al Catálogo
-        </Link>
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <Link
+            href="/dominios"
+            className="inline-flex items-center gap-2 text-sm text-umbra-ink-dim hover:text-umbra-ink transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver al Catálogo
+          </Link>
+          <Link
+            href="/repertorio"
+            className="inline-flex items-center gap-1.5 text-xs text-umbra-cyan hover:underline transition-colors font-medium"
+          >
+            Ver Repertorio de Reglas →
+          </Link>
+        </div>
 
         {/* Encabezado */}
         <header className="mb-10 pb-8 border-b border-umbra-line">
@@ -148,7 +156,11 @@ export default async function DnsDashboardPage() {
         <GraficoTendenciaCVEs apiBase={API_BASE} initialData={tendenciaInicial} />
 
         {/* Matriz MITRE ATT&CK + NIST + Sigma */}
-        <SeccionTecnicas tecnicas={tecnicas} />
+        <SeccionTecnicas
+          tecnicas={tecnicas}
+          dominioCodigo="DNS"
+          dominioNombre="Domain Name System (DNS)"
+        />
 
         {/* Tabla de vulnerabilidades recientes con paginación y filas expandibles */}
         <SeccionVulnerabilidades

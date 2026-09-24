@@ -47,6 +47,12 @@ export default function HeroRadar() {
             >
               Dominios
             </Link>
+            <Link
+              href="/repertorio"
+              className="text-[#8b95ac] hover:text-[#f2f5fa] text-[14.5px] font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#4fd8ff]/50 rounded-md px-1"
+            >
+              Repertorio
+            </Link>
             <a
               href="https://github.com/DanielaMendez-lnx/portal-seguridad"
               target="_blank"
