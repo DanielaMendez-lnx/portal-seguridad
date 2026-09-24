@@ -87,14 +87,20 @@ default_origins = [
 
 env_origins = os.getenv("ALLOWED_ORIGINS", "")
 if env_origins.strip():
-    custom_origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+    custom_origins = [origin.strip().rstrip("/") for origin in env_origins.split(",") if origin.strip()]
     allowed_origins = list(dict.fromkeys(default_origins + custom_origins))
 else:
     allowed_origins = default_origins
 
+# Soporte para dominios dinámicos de Vercel (e.g. preview deployments y producción)
+allowed_origin_regex = os.getenv("ALLOWED_ORIGIN_REGEX", r"^https:\/\/.*\.vercel\.app$")
+if allowed_origin_regex and not allowed_origin_regex.strip():
+    allowed_origin_regex = None
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=allowed_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -107,4 +113,12 @@ app.include_router(tecnicas.router)
 @limiter.exempt
 def health_check():
     return {"status": "ok", "message": "API de Ciberseguridad operativa"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=not is_production)
+
 
