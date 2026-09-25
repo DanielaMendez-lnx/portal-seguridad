@@ -29,6 +29,7 @@ class TecnicaDetalleOut(BaseModel):
     nombre: str
     descripcion: Optional[str]
     tactica: str
+    protocolo: Optional[str] = None
     controles: List[ControlOut] = []
     reglas: List[ReglaOut] = []
 

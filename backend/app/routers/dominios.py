@@ -30,6 +30,24 @@ class VulnerabilidadListOut(BaseModel):
     offset: int
     items: List[VulnerabilidadOut]
 
+def resolver_dominio(db: Session, identificador: str) -> Optional[Dominio]:
+    """Busca el dominio por slug, por nombre o por alias retrocompatible (ej. 'DNS')."""
+    identificador_limpio = identificador.strip()
+    dom = db.query(Dominio).filter(
+        (Dominio.slug.ilike(identificador_limpio)) |
+        (Dominio.nombre.ilike(identificador_limpio))
+    ).first()
+
+    if not dom and identificador_limpio.lower() in (
+        "dns", "network", "network-infrastructure", "network-infrastructure-protocols"
+    ):
+        dom = db.query(Dominio).filter(
+            (Dominio.nombre.ilike("Network Infrastructure & Protocols")) |
+            (Dominio.slug.ilike("network-infrastructure-protocols")) |
+            (Dominio.nombre.ilike("DNS"))
+        ).first()
+    return dom
+
 # 1. Endpoint de Vulnerabilidades (NVD)
 @router.get("/{nombre}/vulnerabilidades", response_model=VulnerabilidadListOut)
 def listar_vulnerabilidades_por_dominio(
@@ -38,7 +56,7 @@ def listar_vulnerabilidades_por_dominio(
     offset: int = Query(default=0, ge=0, description="Número de registros a omitir para paginación"),
     db: Session = Depends(get_db)
 ):
-    dom = db.query(Dominio).filter(Dominio.nombre.ilike(nombre)).first()
+    dom = resolver_dominio(db, nombre)
     if not dom:
         raise HTTPException(status_code=404, detail="Dominio no encontrado")
 
@@ -93,7 +111,7 @@ def obtener_tendencia_vulnerabilidades(
     rango: str = Query(default="6m", pattern="^(6m|1y)$", description="Rango temporal: '6m' (últimos 6 meses) o '1y' (último año)"),
     db: Session = Depends(get_db)
 ):
-    dom = db.query(Dominio).filter(Dominio.nombre.ilike(nombre)).first()
+    dom = resolver_dominio(db, nombre)
     if not dom:
         raise HTTPException(status_code=404, detail="Dominio no encontrado")
 
@@ -128,6 +146,10 @@ def obtener_tendencia_vulnerabilidades(
 # 3. Endpoint de Técnicas (ATT&CK + NIST + Sigma)
 @router.get("/{nombre}/tecnicas")
 def listar_tecnicas_por_dominio(nombre: str, db: Session = Depends(get_db)):
+    dom_ref = resolver_dominio(db, nombre)
+    if not dom_ref:
+        raise HTTPException(status_code=404, detail="Dominio no encontrado")
+
     dom = (
         db.query(Dominio)
         .options(
@@ -141,7 +163,7 @@ def listar_tecnicas_por_dominio(nombre: str, db: Session = Depends(get_db)):
             selectinload(Dominio.tecnicas)
             .selectinload(Tecnica.reglas),
         )
-        .filter(Dominio.nombre.ilike(nombre))
+        .filter(Dominio.id == dom_ref.id)
         .first()
     )
     if not dom:
@@ -153,6 +175,7 @@ def listar_tecnicas_por_dominio(nombre: str, db: Session = Depends(get_db)):
             "id": t.id,
             "nombre": t.nombre,
             "tactica": t.tactica,
+            "protocolo": t.protocolo or "GENERAL",
             "descripcion": t.descripcion,
             "controles": [
                 {

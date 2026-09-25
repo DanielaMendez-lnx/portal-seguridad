@@ -138,7 +138,7 @@ def ejecutar_etl_sigma():
                 continue
 
         print(f"[OK] Pipeline Sigma finalizado: {reglas_insertadas} reglas nuevas creadas, {reglas_actualizadas} reglas actualizadas con URL, {vinculos_creados} vínculos establecidos.")
-        print(f"[*] Cobertura defensiva: {len(tecnicas_cubiertas)}/{len(tecnicas_locales)} técnicas DNS cuentan con reglas de detección activas.")
+        print(f"[*] Cobertura defensiva: {len(tecnicas_cubiertas)}/{len(tecnicas_locales)} técnicas de Network Infrastructure cuentan con reglas de detección activas.")
 
 if __name__ == "__main__":
     ejecutar_etl_sigma()

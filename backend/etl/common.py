@@ -47,9 +47,26 @@ def asegurar_fuente(db: Session, clave_fuente: str) -> int:
     ).returning(Fuente.id)
     return db.execute(stmt).scalar()
 
-def asegurar_dominio(db: Session, nombre: str = "DNS") -> int:
-    """Garantiza la existencia del dominio de ciberseguridad (por defecto DNS)."""
-    stmt = insert(Dominio).values(nombre=nombre).on_conflict_do_nothing().returning(Dominio.id)
+def asegurar_dominio(
+    db: Session,
+    nombre: str = "Network Infrastructure & Protocols",
+    slug: str = "network-infrastructure-protocols"
+) -> int:
+    """Garantiza la existencia y consistencia del dominio de ciberseguridad."""
+    dom = db.query(Dominio).filter(
+        (Dominio.nombre.ilike(nombre)) |
+        (Dominio.slug.ilike(slug)) |
+        (Dominio.nombre.ilike("DNS"))
+    ).first()
+
+    if dom:
+        if dom.nombre != nombre or dom.slug != slug:
+            dom.nombre = nombre
+            dom.slug = slug
+            db.flush()
+        return dom.id
+
+    stmt = insert(Dominio).values(nombre=nombre, slug=slug).on_conflict_do_nothing().returning(Dominio.id)
     dom_id = db.execute(stmt).scalar()
     if not dom_id:
         dom_id = db.query(Dominio.id).filter(Dominio.nombre.ilike(nombre)).scalar()

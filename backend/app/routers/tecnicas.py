@@ -54,6 +54,7 @@ def obtener_tecnica(
         nombre=tecnica.nombre,
         descripcion=tecnica.descripcion,
         tactica=tecnica.tactica,
+        protocolo=tecnica.protocolo,
         controles=controles_dto,
         reglas=reglas_dto
     )

@@ -12,26 +12,57 @@ from app.models import Tecnica, tecnica_dominio
 from etl.common import asegurar_dominio, asegurar_fuente, sesion_etl
 from etl.config_fuentes import CONFIG_FUENTES
 
-print(">>> Iniciando script de ingesta de MITRE ATT&CK...")
+# Clasificación formal de técnicas para el dominio "Network Infrastructure & Protocols"
+TECNICAS_OBJETIVO = {
+    # DNS
+    "T1071.004": "DNS",
+    "T1590.002": "DNS",
+    "T1596.001": "DNS",
+    "T1583.002": "DNS",
+    "T1584.002": "DNS",
+    "T1568.001": "DNS",
+    # SMB
+    "T1021.002": "SMB",
+    "T1557.001": "SMB",
+    # FTP / TFTP
+    "T1071.002": "FTP",
+    "T1542.005": "FTP",
+    "T1048.003": "FTP",
+    # Core L2/L3 (DHCP & ARP)
+    "T1557.003": "DHCP",
+    "T1557.002": "ARP",
+    "T1016": "ARP",
+    # General de Red
+    "T1040": "GENERAL",
+    "T1046": "GENERAL",
+    "T1557": "GENERAL",
+    "T1498": "GENERAL",
+}
+
+print(">>> Iniciando script de ingesta de MITRE ATT&CK para Network Infrastructure & Protocols...")
 
 def ejecutar_etl_mitre():
     with sesion_etl() as db:
-        print("[*] Verificando fuente y dominios base en Neon...")
+        print("[*] Verificando fuente y dominio base en Neon...")
         asegurar_fuente(db, "MITRE ATT&CK")
-        dominio_dns_id = asegurar_dominio(db, "DNS")
+        dominio_id = asegurar_dominio(
+            db,
+            nombre="Network Infrastructure & Protocols",
+            slug="network-infrastructure-protocols"
+        )
 
         url_stix = CONFIG_FUENTES["MITRE ATT&CK"]["url"]
         print(f"[*] Descargando STIX oficial de MITRE ATT&CK ({url_stix[:50]}...)...")
 
-        resp = requests.get(url_stix, timeout=30)
+        resp = requests.get(url_stix, timeout=60)
         resp.raise_for_status()
         bundle = resp.json()
 
-        tecnicas_dns = []
+        tecnicas_a_ingestar = []
 
-        # Filtro de objetos tipo attack-pattern vinculados a DNS
+        # Filtro de objetos tipo attack-pattern vinculados al dominio de infraestructura de red
         for obj in bundle.get("objects", []):
-            if obj.get("type") == "attack-pattern" and not obj.get("revoked", False):
+            if obj.get("type") == "attack-pattern" and not obj.get("revoked", False) and not obj.get("x_mitre_deprecated", False):
                 external_refs = obj.get("external_references", [])
                 mitre_ref = next((ref for ref in external_refs if ref.get("source_name") == "mitre-attack"), None)
 
@@ -42,36 +73,42 @@ def ejecutar_etl_mitre():
                 nombre = obj.get("name", "")
                 descripcion = obj.get("description", "")
 
-                # Filtrar técnicas asociadas al dominio de interés (DNS)
-                es_dns = "DNS" in nombre or "DNS" in descripcion or tecnica_id == "T1071.004"
+                protocolo = None
+                if tecnica_id in TECNICAS_OBJETIVO:
+                    protocolo = TECNICAS_OBJETIVO[tecnica_id]
+                elif "DNS" in nombre or "DNS" in descripcion or tecnica_id == "T1071.004":
+                    protocolo = "DNS"
 
-                if es_dns:
+                if protocolo:
                     # Extraer táctica principal
                     kill_chain = obj.get("kill_chain_phases", [])
                     tactica = kill_chain[0]["phase_name"].replace("-", " ").title() if kill_chain else "Unknown"
 
-                    tecnicas_dns.append({
+                    tecnicas_a_ingestar.append({
                         "id": tecnica_id,
                         "nombre": nombre,
-                        "descripcion": descripcion[:1000],  # Truncado de seguridad
-                        "tactica": tactica
+                        "descripcion": descripcion[:1000] if descripcion else "",
+                        "tactica": tactica,
+                        "protocolo": protocolo,
                     })
 
-        print(f"[*] Se identificaron {len(tecnicas_dns)} técnicas relacionadas con DNS.")
+        print(f"[*] Se identificaron {len(tecnicas_a_ingestar)} técnicas pertenecientes a Network Infrastructure & Protocols.")
 
         # Inserción Idempotente (UPSERT)
-        for t in tecnicas_dns:
+        for t in tecnicas_a_ingestar:
             stmt_tecnica = insert(Tecnica).values(
                 id=t["id"],
                 nombre=t["nombre"],
                 descripcion=t["descripcion"],
-                tactica=t["tactica"]
+                tactica=t["tactica"],
+                protocolo=t["protocolo"],
             ).on_conflict_do_update(
                 index_elements=["id"],
                 set_={
                     "nombre": t["nombre"],
                     "descripcion": t["descripcion"],
-                    "tactica": t["tactica"]
+                    "tactica": t["tactica"],
+                    "protocolo": t["protocolo"],
                 }
             )
             db.execute(stmt_tecnica)
@@ -79,11 +116,11 @@ def ejecutar_etl_mitre():
             # Vincular con la tabla asociativa técnica_dominio
             stmt_rel = insert(tecnica_dominio).values(
                 tecnica_id=t["id"],
-                dominio_id=dominio_dns_id
+                dominio_id=dominio_id
             ).on_conflict_do_nothing()
             db.execute(stmt_rel)
 
-        print("[OK] Pipeline de MITRE ATT&CK finalizado exitosamente.")
+        print("[OK] Pipeline de MITRE ATT&CK finalizado exitosamente con clasificación de protocolos.")
 
 if __name__ == "__main__":
     ejecutar_etl_mitre()

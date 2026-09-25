@@ -60,7 +60,8 @@ class Dominio(Base):
     __tablename__ = "dominios"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(50), unique=True, nullable=False)
+    nombre = Column(String(100), unique=True, nullable=False)
+    slug = Column(String(100), unique=True, nullable=True)
 
     tecnicas = relationship("Tecnica", secondary=tecnica_dominio, back_populates="dominios")
     vulnerabilidades = relationship("Vulnerabilidad", secondary=vulnerabilidad_dominio, back_populates="dominios")
@@ -101,6 +102,7 @@ class Tecnica(Base):
     nombre = Column(String(150), nullable=False)
     descripcion = Column(Text, nullable=True)
     tactica = Column(String(50), nullable=False)
+    protocolo = Column(String(50), nullable=True, index=True)
 
     dominios = relationship("Dominio", secondary=tecnica_dominio, back_populates="tecnicas")
     reglas = relationship("ReglaDeteccion", secondary=tecnica_regla, back_populates="tecnicas")
