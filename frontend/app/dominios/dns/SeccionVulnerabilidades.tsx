@@ -72,7 +72,7 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
     <section className="bg-umbra-surface border border-umbra-line rounded-2xl p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h2 className="text-lg font-bold text-umbra-ink">Vulnerabilidades Recientes (NVD)</h2>
+          <h2 className="text-lg font-bold text-umbra-ink">Vulnerabilidades de Red Recientes (NVD)</h2>
           <p className="text-xs text-umbra-ink-dim mt-0.5">
             Ingesta directa de la API de NIST con validación de severidad y contrato CVSS.
           </p>
