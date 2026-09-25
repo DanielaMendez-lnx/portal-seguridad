@@ -27,10 +27,22 @@ export interface Tecnica {
   id: string;
   nombre: string;
   tactica: string;
+  protocolo?: string;
   descripcion: string | null;
   controles: Control[];
   reglas: Regla[];
 }
+
+export type FiltroProtocolo = "TODOS" | "DNS" | "SMB" | "FTP" | "CORE_L2_L3" | "GENERAL";
+
+const PROTOCOLOS_CONFIG: { key: FiltroProtocolo; label: string }[] = [
+  { key: "TODOS", label: "Todos" },
+  { key: "DNS", label: "DNS" },
+  { key: "SMB", label: "SMB" },
+  { key: "FTP", label: "FTP" },
+  { key: "CORE_L2_L3", label: "Core L2/L3" },
+  { key: "GENERAL", label: "General de Red" },
+];
 
 interface Props {
   tecnicas: Tecnica[];
@@ -48,10 +60,11 @@ function limpiarDescripcionMitre(texto: string): string {
 
 export default function SeccionTecnicas({
   tecnicas,
-  dominioCodigo = "DNS",
-  dominioNombre = "Domain Name System (DNS)",
+  dominioCodigo = "NET-INFRA",
+  dominioNombre = "Network Infrastructure & Protocols",
 }: Props) {
   const { esFavorito, toggleFavorito } = useFavoritos();
+  const [protocoloSeleccionado, setProtocoloSeleccionado] = useState<FiltroProtocolo>("TODOS");
   const [busqueda, setBusqueda] = useState("");
   const [tacticaSeleccionada, setTacticaSeleccionada] = useState("TODAS");
   const [tecnicaExpandida, setTecnicaExpandida] = useState<string | null>(null);
@@ -69,17 +82,73 @@ export default function SeccionTecnicas({
     }
   };
 
+  const getProtocolBadge = (protocolo?: string) => {
+    switch (protocolo?.toUpperCase()) {
+      case "DNS":
+        return {
+          label: "DNS",
+          className: "bg-sky-500/10 text-sky-400 border-sky-500/30",
+        };
+      case "SMB":
+        return {
+          label: "SMB",
+          className: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+        };
+      case "FTP":
+        return {
+          label: "FTP / TFTP",
+          className: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30",
+        };
+      case "DHCP":
+        return {
+          label: "DHCP",
+          className: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+        };
+      case "ARP":
+        return {
+          label: "ARP",
+          className: "bg-purple-500/10 text-purple-400 border-purple-500/30",
+        };
+      case "GENERAL":
+      default:
+        return {
+          label: "RED GENERAL",
+          className: "bg-slate-500/10 text-slate-300 border-slate-500/30",
+        };
+    }
+  };
+
+  // Contadores dinámicos por protocolo
+  const conteoProtocolos: Record<FiltroProtocolo, number> = {
+    TODOS: tecnicas.length,
+    DNS: tecnicas.filter((t) => (t.protocolo || "DNS").toUpperCase() === "DNS").length,
+    SMB: tecnicas.filter((t) => t.protocolo?.toUpperCase() === "SMB").length,
+    FTP: tecnicas.filter((t) => t.protocolo?.toUpperCase() === "FTP").length,
+    CORE_L2_L3: tecnicas.filter((t) => ["DHCP", "ARP"].includes((t.protocolo || "").toUpperCase())).length,
+    GENERAL: tecnicas.filter((t) => (t.protocolo || "").toUpperCase() === "GENERAL").length,
+  };
+
   // Extraer lista única de tácticas
   const tacticas = ["TODAS", ...Array.from(new Set(tecnicas.map((t) => t.tactica)))];
 
-  // Filtrado reactivo
+  // Filtrado reactivo combinado: Protocolo + Texto + Táctica
   const tecnicasFiltradas = tecnicas.filter((t) => {
+    const proto = (t.protocolo || "DNS").toUpperCase();
+
+    let coincideProtocolo = true;
+    if (protocoloSeleccionado === "DNS") coincideProtocolo = proto === "DNS";
+    else if (protocoloSeleccionado === "SMB") coincideProtocolo = proto === "SMB";
+    else if (protocoloSeleccionado === "FTP") coincideProtocolo = proto === "FTP";
+    else if (protocoloSeleccionado === "CORE_L2_L3") coincideProtocolo = ["DHCP", "ARP"].includes(proto);
+    else if (protocoloSeleccionado === "GENERAL") coincideProtocolo = proto === "GENERAL";
+
     const coincideTexto =
       t.id.toLowerCase().includes(busqueda.toLowerCase()) ||
       t.nombre.toLowerCase().includes(busqueda.toLowerCase());
     const coincideTactica =
       tacticaSeleccionada === "TODAS" || t.tactica === tacticaSeleccionada;
-    return coincideTexto && coincideTactica;
+
+    return coincideProtocolo && coincideTexto && coincideTactica;
   });
 
   const toggleExpandir = (id: string) => {
@@ -111,6 +180,46 @@ export default function SeccionTecnicas({
         </div>
       </div>
 
+      {/* Selector Primario: Filtros por Protocolo */}
+      <div className="mb-5 pb-5 border-b border-umbra-line/70">
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-xs font-semibold text-umbra-ink uppercase tracking-wider">
+            Vector de Protocolo
+          </span>
+          <span className="text-[11px] text-umbra-ink-dim">
+            Mostrando {tecnicasFiltradas.length} de {tecnicas.length} técnicas
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {PROTOCOLOS_CONFIG.map((p) => {
+            const activo = protocoloSeleccionado === p.key;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setProtocoloSeleccionado(p.key)}
+                className={`text-xs px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${
+                  activo
+                    ? "bg-umbra-cyan/20 border-umbra-cyan text-umbra-cyan font-semibold shadow-sm shadow-umbra-cyan/20"
+                    : "bg-umbra-bg border-umbra-line text-umbra-ink-dim hover:border-white/20 hover:text-umbra-ink"
+                }`}
+              >
+                <span>{p.label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                    activo
+                      ? "bg-umbra-cyan/30 text-umbra-cyan font-bold"
+                      : "bg-umbra-surface text-umbra-ink-muted"
+                  }`}
+                >
+                  {conteoProtocolos[p.key]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Filtros de tácticas */}
       <div className="flex flex-wrap gap-2 mb-6">
         {tacticas.map((tac) => (
@@ -137,6 +246,7 @@ export default function SeccionTecnicas({
         ) : (
           tecnicasFiltradas.map((t) => {
             const expandida = tecnicaExpandida === t.id;
+            const badge = getProtocolBadge(t.protocolo);
             return (
               <div
                 key={t.id}
@@ -156,14 +266,19 @@ export default function SeccionTecnicas({
                   }}
                   className="p-4 flex items-center justify-between cursor-pointer hover:bg-umbra-surface-hover/50 transition-colors focus:outline-none focus:ring-2 focus:ring-umbra-cyan/50 rounded-xl"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs font-bold text-umbra-cyan bg-umbra-cyan/10 border border-umbra-cyan/30 px-2.5 py-1 rounded-md">
+                  <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                    <span className="font-mono text-xs font-bold text-umbra-cyan bg-umbra-cyan/10 border border-umbra-cyan/30 px-2.5 py-1 rounded-md shrink-0">
                       {t.id}
+                    </span>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border tracking-wider shrink-0 ${badge.className}`}
+                    >
+                      {badge.label}
                     </span>
                     <span className="text-sm font-semibold text-umbra-ink">
                       {t.nombre}
                     </span>
-                    <span className="hidden sm:inline-block text-xs text-umbra-ink-dim bg-umbra-surface border border-umbra-line px-2 py-0.5 rounded-md">
+                    <span className="hidden sm:inline-block text-xs text-umbra-ink-dim bg-umbra-surface border border-umbra-line px-2 py-0.5 rounded-md shrink-0">
                       {t.tactica}
                     </span>
                   </div>

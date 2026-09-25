@@ -102,15 +102,15 @@ export default async function DnsDashboardPage() {
         <header className="mb-10 pb-8 border-b border-umbra-line">
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-umbra-ink">
-              Dominio: Domain Name System (DNS)
+              Dominio: Network Infrastructure & Protocols
             </h1>
             <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800/60 rounded-full">
               En Producción
             </span>
           </div>
           <p className="text-umbra-ink-dim max-w-3xl">
-            Correlación analítica entre técnicas de ataque MITRE ATT&CK, marcos de mitigación NIST,
-            reglas de detección y vulnerabilidades NVD.
+            Correlación analítica entre técnicas de ataque MITRE ATT&CK, marcos de mitigación NIST SP 800-53,
+            reglas de detección SigmaHQ y vulnerabilidades para DNS, SMB, FTP, Servicios L2/L3 y Tráfico de Red.
           </p>
         </header>
 
@@ -158,8 +158,8 @@ export default async function DnsDashboardPage() {
         {/* Matriz MITRE ATT&CK + NIST + Sigma */}
         <SeccionTecnicas
           tecnicas={tecnicas}
-          dominioCodigo="DNS"
-          dominioNombre="Domain Name System (DNS)"
+          dominioCodigo="NET-INFRA"
+          dominioNombre="Network Infrastructure & Protocols"
         />
 
         {/* Tabla de vulnerabilidades recientes con paginación y filas expandibles */}

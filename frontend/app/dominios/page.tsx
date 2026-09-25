@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { Globe, Key, ArrowRight, ArrowLeft } from "lucide-react";
+import { Network, Key, ArrowRight, ArrowLeft } from "lucide-react";
 
 export default function DominiosCatalogPage() {
   return (
@@ -32,7 +32,7 @@ export default function DominiosCatalogPage() {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Tarjeta DNS (Activa) */}
+          {/* Tarjeta Network Infrastructure & Protocols (Activa) */}
           <Link
             href="/dominios/dns"
             className="group relative bg-umbra-surface border border-umbra-line hover:border-umbra-cyan/50 p-6 rounded-2xl transition-all hover:shadow-xl hover:shadow-umbra-cyan/10 flex flex-col justify-between"
@@ -40,17 +40,17 @@ export default function DominiosCatalogPage() {
             <div>
               <div className="flex justify-between items-start mb-4">
                 <div className="p-3 bg-umbra-cyan/10 text-umbra-cyan border border-umbra-cyan/30 rounded-xl">
-                  <Globe className="w-6 h-6" />
+                  <Network className="w-6 h-6" />
                 </div>
                 <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800/60 rounded-full">
                   Activo
                 </span>
               </div>
               <h2 className="text-xl font-bold mb-2 text-umbra-ink group-hover:text-umbra-cyan transition-colors">
-                Dominio DNS
+                Network Infrastructure & Protocols
               </h2>
               <p className="text-sm text-umbra-ink-dim leading-relaxed mb-6">
-                Resolución de nombres, infraestructura de resolvers, envenenamiento de caché, túneles DNS y mitigaciones clave.
+                Resolución de nombres (DNS), transporte SMB, transferencia de archivos (FTP), servicios de enlace L2/L3 (DHCP/ARP) y monitoreo de tráfico de red.
               </p>
             </div>
 
