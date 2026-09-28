@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Límite máximo en Vercel Hobby (60 segundos)
 
 import Link from "next/link";
 import { ArrowLeft, ShieldAlert, AlertTriangle, ShieldCheck, Activity } from "lucide-react";
@@ -16,52 +17,90 @@ interface VulnerabilidadesResponse {
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
-async function getVulnerabilidades(): Promise<VulnerabilidadesResponse> {
-  try {
-    const res = await fetch(`${API_BASE}/dominios/DNS/vulnerabilidades`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return { total: 0, limit: 40, offset: 0, items: [] };
-    return await res.json();
-  } catch (error) {
-    console.error("[Fetch Error] Vulnerabilidades:", error);
-    return { total: 0, limit: 40, offset: 0, items: [] };
-  }
-}
+/**
+ * Helper de fetch con timeout explícito (45s) y demora configurable de depuración.
+ * La demora compite directamente con el AbortSignal para reproducir de forma realista
+ * el mismo TimeoutError que causaría un backend no responsivo.
+ */
+async function fetchWithTimeoutAndDebugDelay(url: string, timeoutMs = 45000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort(new DOMException("Timeout de conexión con el backend", "TimeoutError"));
+  }, timeoutMs);
+  const signal = controller.signal;
 
-async function getTendenciaInicial(): Promise<TendenciaMes[]> {
-  try {
-    const res = await fetch(`${API_BASE}/dominios/DNS/vulnerabilidades/tendencia?rango=6m`, {
-      cache: "no-store",
+  const debugDelay = parseInt(process.env.DEBUG_FETCH_DELAY_MS || "0", 10);
+  if (debugDelay > 0) {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(resolve, debugDelay);
+      signal.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        },
+        { once: true }
+      );
     });
-    if (!res.ok) return [];
-    return await res.json();
-  } catch (error) {
-    console.error("[Fetch Error] Tendencia:", error);
-    return [];
+  }
+
+  try {
+    const res = await fetch(url, { signal, cache: "no-store" });
+    return res;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
 async function getTecnicas(): Promise<Tecnica[]> {
-  try {
-    const res = await fetch(`${API_BASE}/dominios/DNS/tecnicas`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    return await res.json();
-  } catch (error) {
-    console.error("[Fetch Error] Técnicas:", error);
-    return [];
+  const res = await fetchWithTimeoutAndDebugDelay(`${API_BASE}/dominios/DNS/tecnicas`);
+  if (!res.ok) {
+    throw new Error(`Error en el servidor al obtener técnicas (${res.status})`);
   }
+  return await res.json();
+}
+
+async function getVulnerabilidades(): Promise<VulnerabilidadesResponse> {
+  const res = await fetchWithTimeoutAndDebugDelay(`${API_BASE}/dominios/DNS/vulnerabilidades`);
+  if (!res.ok) {
+    throw new Error(`Error en el servidor al obtener vulnerabilidades (${res.status})`);
+  }
+  return await res.json();
+}
+
+async function getTendenciaInicial(): Promise<TendenciaMes[]> {
+  const res = await fetchWithTimeoutAndDebugDelay(`${API_BASE}/dominios/DNS/vulnerabilidades/tendencia?rango=6m`);
+  if (!res.ok) {
+    throw new Error(`Error en el servidor al obtener tendencia (${res.status})`);
+  }
+  return await res.json();
 }
 
 export default async function DnsDashboardPage() {
-  // Carga concurrente
-  const [cvesData, tecnicas, tendenciaInicial] = await Promise.all([
-    getVulnerabilidades(),
+  // Carga concurrente con Promise.allSettled
+  const [tecnicasRes, cvesRes, tendenciaRes] = await Promise.allSettled([
     getTecnicas(),
+    getVulnerabilidades(),
     getTendenciaInicial(),
   ]);
+
+  // 1. Fetch principal (crítico): si falló, relanzamos explícitamente para que error.tsx capture la excepción
+  if (tecnicasRes.status === "rejected") {
+    throw tecnicasRes.reason;
+  }
+
+  const tecnicas = tecnicasRes.value;
+
+  // 2. Fetches secundarios (resilientes): si fallan, se proporcionan valores por defecto y no se tumba la página completa
+  const cvesData: VulnerabilidadesResponse =
+    cvesRes.status === "fulfilled"
+      ? cvesRes.value
+      : { total: 0, limit: 40, offset: 0, items: [] };
+
+  const tendenciaInicial: TendenciaMes[] =
+    tendenciaRes.status === "fulfilled"
+      ? tendenciaRes.value
+      : [];
 
   const cves = cvesData.items;
   const totalCves = cvesData.total;
@@ -172,4 +211,3 @@ export default async function DnsDashboardPage() {
     </main>
   );
 }
-

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, Fragment } from "react";
-import { ChevronDown, ChevronUp, ExternalLink, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import LoadingRadar from "@/app/components/radar/LoadingRadar";
 
 export interface Vulnerabilidad {
   id: string;
@@ -22,6 +23,7 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
   const [totalCves, setTotalCves] = useState<number>(total);
   const [offset, setOffset] = useState<number>(initialCves.length);
   const [cargando, setCargando] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const [cveExpandido, setCveExpandido] = useState<string | null>(null);
 
   const getSeverityBadge = (severity: string | null) => {
@@ -48,6 +50,7 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
   const cargarMas = async () => {
     if (cargando || !hayMas) return;
     setCargando(true);
+    setError(null);
     try {
       const res = await fetch(`${apiBase}/dominios/DNS/vulnerabilidades?limit=40&offset=${offset}`);
       if (!res.ok) {
@@ -61,8 +64,9 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
           setTotalCves(data.total);
         }
       }
-    } catch (error) {
-      console.error("[Cargar Más Error]:", error);
+    } catch (err) {
+      console.error("[Cargar Más Error]:", err);
+      setError("No se pudieron cargar más vulnerabilidades.");
     } finally {
       setCargando(false);
     }
@@ -206,22 +210,22 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
         </table>
       </div>
 
-      {/* Botón Cargar Más */}
+      {/* Botón Cargar Más o Indicador Compacto */}
       <div className="mt-6 flex flex-col items-center justify-center">
-        {hayMas ? (
+        {cargando || error ? (
+          <div className="py-2">
+            <LoadingRadar
+              variant="compact"
+              error={error}
+              onRetry={cargarMas}
+            />
+          </div>
+        ) : hayMas ? (
           <button
             onClick={cargarMas}
-            disabled={cargando}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-umbra-surface hover:bg-umbra-surface-hover text-umbra-ink border border-umbra-line disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-umbra-surface hover:bg-umbra-surface-hover text-umbra-ink border border-umbra-line transition-all cursor-pointer shadow-sm hover:border-umbra-cyan/40"
           >
-            {cargando ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-umbra-cyan" />
-                <span>Cargando más registros...</span>
-              </>
-            ) : (
-              <span>Cargar más ({cves.length} de {totalCves})</span>
-            )}
+            <span>Cargar más ({cves.length} de {totalCves})</span>
           </button>
         ) : (
           totalCves > 0 && (

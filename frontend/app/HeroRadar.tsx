@@ -1,23 +1,13 @@
 import Link from "next/link";
 import styles from "./HeroRadar.module.css";
+import RadarGraphic from "./components/radar/RadarGraphic";
 
 export default function HeroRadar() {
   return (
     <div className="relative overflow-hidden bg-[#020305] text-[#f2f5fa] min-h-[92vh] flex flex-col justify-between">
       {/* Escenario de fondo del Radar animado */}
       <div className={styles.radarStage} aria-hidden="true">
-        <div className={`${styles.radarRing} ${styles.ring1}`} />
-        <div className={`${styles.radarRing} ${styles.ring2}`} />
-        <div className={`${styles.radarRing} ${styles.ring3}`} />
-        <div className={`${styles.radarRing} ${styles.ring4}`} />
-        <div className={styles.radarCross} />
-        <div className={`${styles.radarCross} ${styles.crossVert}`} />
-        <div className={styles.radarSweep} />
-        <div className={`${styles.blip} ${styles.blip1}`} />
-        <div className={`${styles.blip} ${styles.blip2}`} />
-        <div className={`${styles.blip} ${styles.blip3}`} />
-        <div className={`${styles.blip} ${styles.blip4}`} />
-        <div className={`${styles.blip} ${styles.blip5}`} />
+        <RadarGraphic size="hero" />
       </div>
 
       {/* Difuminado radial para fundir el radar con el fondo */}

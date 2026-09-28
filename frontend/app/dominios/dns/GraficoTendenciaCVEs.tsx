@@ -10,7 +10,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { Loader2 } from "lucide-react";
+import LoadingRadar from "@/app/components/radar/LoadingRadar";
 
 export interface TendenciaMes {
   mes: string;
@@ -26,7 +26,26 @@ export default function GraficoTendenciaCVEs({ apiBase, initialData = [] }: Prop
   const [rango, setRango] = useState<"6m" | "1y">("6m");
   const [datos, setDatos] = useState<TendenciaMes[]>(initialData);
   const [cargando, setCargando] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const yaCargoInicial = useRef(initialData.length > 0);
+
+  const cargarTendencia = async (rangoTarget = rango) => {
+    setCargando(true);
+    setError(null);
+    try {
+      const res = await fetch(`${apiBase}/dominios/DNS/vulnerabilidades/tendencia?rango=${rangoTarget}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("Error al obtener tendencia de vulnerabilidades");
+      const data: TendenciaMes[] = await res.json();
+      setDatos(data);
+    } catch (err) {
+      console.error("[Tendencia Error]:", err);
+      setError("No se pudo obtener la tendencia temporal.");
+    } finally {
+      setCargando(false);
+    }
+  };
 
   useEffect(() => {
     // Si ya tenemos datos iniciales de SSR en 6m, omitimos la primera llamada redundante
@@ -35,32 +54,7 @@ export default function GraficoTendenciaCVEs({ apiBase, initialData = [] }: Prop
       return;
     }
 
-    let isMounted = true;
-    const cargarTendencia = async () => {
-      setCargando(true);
-      try {
-        const res = await fetch(`${apiBase}/dominios/DNS/vulnerabilidades/tendencia?rango=${rango}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) throw new Error("Error al obtener tendencia de vulnerabilidades");
-        const data: TendenciaMes[] = await res.json();
-        if (isMounted) {
-          setDatos(data);
-        }
-      } catch (err) {
-        console.error("[Tendencia Error]:", err);
-      } finally {
-        if (isMounted) {
-          setCargando(false);
-        }
-      }
-    };
-
-    cargarTendencia();
-
-    return () => {
-      isMounted = false;
-    };
+    cargarTendencia(rango);
   }, [rango, apiBase]);
 
   const formatearMes = (mesStr: string) => {
@@ -118,9 +112,13 @@ export default function GraficoTendenciaCVEs({ apiBase, initialData = [] }: Prop
       </div>
 
       <div className="h-64 w-full relative">
-        {cargando && (
-          <div className="absolute inset-0 bg-umbra-surface/60 backdrop-blur-xs flex items-center justify-center z-10 rounded-xl">
-            <Loader2 className="w-6 h-6 animate-spin text-umbra-cyan" />
+        {(cargando || error) && (
+          <div className="absolute inset-0 bg-umbra-surface/85 backdrop-blur-xs flex items-center justify-center z-10 rounded-xl">
+            <LoadingRadar
+              variant="compact"
+              error={error}
+              onRetry={() => cargarTendencia(rango)}
+            />
           </div>
         )}
 
