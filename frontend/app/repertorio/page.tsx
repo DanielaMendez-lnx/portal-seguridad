@@ -192,6 +192,15 @@ export default function RepertorioPage() {
       }
     }
 
+    // Bloque de atribución legal al final del reporte exportado (una sola línea en cursiva)
+    lineas.push("");
+    lineas.push("---");
+    lineas.push("");
+    lineas.push(
+      "*Fuentes: MITRE ATT&CK® — © 2026 The MITRE Corporation. This work is reproduced and distributed with the permission of The MITRE Corporation ([términos](https://attack.mitre.org/resources/legal-and-branding/terms-of-use/)). Reglas: [SigmaHQ](https://github.com/SigmaHQ/sigma), licencia [DRL 1.1](https://github.com/SigmaHQ/Detection-Rule-License).*"
+    );
+    lineas.push("");
+
     const contenidoMd = lineas.join("\n");
     const blob = new Blob([contenidoMd], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);

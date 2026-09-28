@@ -76,7 +76,17 @@ export default function GraficoTendenciaCVEs({ apiBase, initialData = [] }: Prop
     <div className="bg-umbra-surface border border-umbra-line rounded-2xl p-6 mb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h2 className="text-lg font-bold text-umbra-ink">CVEs de Red Divulgados por Mes</h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-lg font-bold text-umbra-ink">CVEs de Red Divulgados por Mes</h2>
+            <a
+              href="https://nvd.nist.gov/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-mono text-umbra-cyan/80 hover:text-umbra-cyan hover:underline transition-colors"
+            >
+              Fuente: NVD ↗
+            </a>
+          </div>
           <p className="text-xs text-umbra-ink-dim mt-0.5">
             Frecuencia de vulnerabilidades de infraestructura y protocolos de red (DNS, SMB, FTP, servicios L2/L3) publicadas formalmente en NVD según su fecha oficial de divulgación.
           </p>

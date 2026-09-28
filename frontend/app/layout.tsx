@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import Footer from "./components/Footer";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -22,14 +23,17 @@ export const metadata: Metadata = {
     "Portal abierto de inteligencia de amenazas: correlación de técnicas MITRE ATT&CK, controles normativos NIST SP 800-53, reglas Sigma y vulnerabilidades NVD.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="es"
       className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#020305] text-[#f2f5fa] font-sans">
-        {children}
+        <div className="flex-1 flex flex-col">
+          {children}
+        </div>
+        <Footer />
       </body>
     </html>
   );

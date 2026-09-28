@@ -396,9 +396,20 @@ export default function SeccionTecnicas({
 
                       {/* Reglas Sigma */}
                       <div className="bg-umbra-surface/80 border border-umbra-line p-3.5 rounded-lg">
-                        <div className="flex items-center gap-2 text-xs font-bold text-umbra-cyan mb-2">
-                          <Terminal className="w-4 h-4" />
-                          Detecciones SigmaHQ
+                        <div className="flex items-center justify-between text-xs font-bold text-umbra-cyan mb-2">
+                          <div className="flex items-center gap-2">
+                            <Terminal className="w-4 h-4" />
+                            <span>Detecciones SigmaHQ</span>
+                          </div>
+                          <a
+                            href="https://github.com/SigmaHQ/Detection-Rule-License"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[11px] font-mono font-normal text-umbra-ink-muted hover:text-umbra-cyan hover:underline transition-colors"
+                          >
+                            Reglas: SigmaHQ · DRL 1.1 ↗
+                          </a>
                         </div>
                         {t.reglas.length === 0 ? (
                           <p className="text-xs text-umbra-ink-muted">Sin reglas específicas registradas.</p>

@@ -43,12 +43,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* Pie de página */}
-      <footer className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 py-10 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#8b95ac]">
-        <span>Umbra Radar — Threat Intelligence & Security Analytics Platform</span>
-        <span>MITRE ATT&CK • NIST SP 800-53 • NVD • CISA • SigmaHQ</span>
-      </footer>
     </main>
   );
 }

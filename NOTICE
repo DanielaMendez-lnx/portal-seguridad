@@ -1,0 +1,47 @@
+Umbra Radar
+Copyright 2026 Daniela Méndez
+
+The software source code of this project is licensed under the Apache License, Version 2.0.
+
+===============================================================================
+THIRD-PARTY DATA AND CONTENT NOTICES
+===============================================================================
+
+The Apache License, Version 2.0 applies strictly to the software source code
+developed for this project. Threat intelligence taxonomies, regulatory
+mappings, vulnerability feeds, detection rules, and security advisories
+ingested, correlated, or displayed by this application remain the property of
+their respective creators and retain their original licenses and terms of use:
+
+1. MITRE ATT&CK®
+   © 2026 The MITRE Corporation. This work is reproduced and distributed with
+   the permission of The MITRE Corporation.
+   MITRE ATT&CK and ATT&CK are registered trademarks of The MITRE Corporation.
+   Website: https://attack.mitre.org/
+   Terms of Use: https://attack.mitre.org/resources/legal-and-branding/terms-of-use/
+
+2. National Vulnerability Database (NVD) / NIST
+   This product uses the NVD API but is not endorsed or certified by
+   the NVD.
+   Website: https://nvd.nist.gov/
+   Terms of Use: https://nvd.nist.gov/developers/terms-of-use
+
+3. Center for Threat-Informed Defense (CTID) — Mappings Explorer
+   © 2024 MITRE. Approved for public release. Document number(s) CT0104.
+   Licensed under the Apache License, Version 2.0 (the "License").
+   Repository: https://github.com/center-for-threat-informed-defense/mappings-explorer
+
+4. SigmaHQ (Detection Rules)
+   The Sigma specification and logo are in the public domain.
+   Detection rules from the SigmaHQ repository (https://github.com/SigmaHQ/sigma)
+   are licensed under the Detection Rule License (DRL) 1.1:
+   https://github.com/SigmaHQ/Detection-Rule-License
+   Per DRL 1.1 requirements, each detection rule indexed in this application
+   provides a direct link to its original upstream rule file in the SigmaHQ
+   repository, where original authorship, metadata, and license notices are
+   preserved.
+
+5. Cybersecurity and Infrastructure Security Agency (CISA)
+   CISA Advisories and publications are works of the United States Government
+   and are in the public domain within the United States under 17 U.S.C. § 105.
+   Website: https://www.cisa.gov/
