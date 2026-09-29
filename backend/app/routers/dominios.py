@@ -5,12 +5,17 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import Control, Dominio, Tecnica, TecnicaControl, Vulnerabilidad
-from app.schemas import TendenciaMesOut
+from app.schemas import (
+    CoberturaResumen,
+    DominioCoberturaOut,
+    TecnicaCoberturaItem,
+    TendenciaMesOut,
+)
 
 router = APIRouter(prefix="/dominios", tags=["Dominios & Métricas"])
 
@@ -31,7 +36,7 @@ class VulnerabilidadListOut(BaseModel):
     items: List[VulnerabilidadOut]
 
 def resolver_dominio(db: Session, identificador: str) -> Optional[Dominio]:
-    """Busca el dominio por slug, por nombre o por alias retrocompatible (ej. 'DNS')."""
+    """Busca el dominio por slug, por nombre o por alias retrocompatible (ej. 'DNS', 'Endpoint')."""
     identificador_limpio = identificador.strip()
     dom = db.query(Dominio).filter(
         (Dominio.slug.ilike(identificador_limpio)) |
@@ -46,6 +51,15 @@ def resolver_dominio(db: Session, identificador: str) -> Optional[Dominio]:
             (Dominio.slug.ilike("network-infrastructure-protocols")) |
             (Dominio.nombre.ilike("DNS"))
         ).first()
+
+    if not dom and identificador_limpio.lower() in (
+        "endpoint", "endpoint-security", "host", "host-security", "endpoint-host-security"
+    ):
+        dom = db.query(Dominio).filter(
+            (Dominio.nombre.ilike("Endpoint & Host Security")) |
+            (Dominio.slug.ilike("endpoint-host-security"))
+        ).first()
+
     return dom
 
 # 1. Endpoint de Vulnerabilidades (NVD)
@@ -201,3 +215,80 @@ def listar_tecnicas_por_dominio(nombre: str, db: Session = Depends(get_db)):
         })
 
     return resultado
+
+
+# 4. Endpoint de Cobertura y Métricas de Detección del Dominio
+@router.get("/{nombre}/cobertura", response_model=DominioCoberturaOut)
+def obtener_cobertura_dominio(nombre: str, db: Session = Depends(get_db)):
+    dom = resolver_dominio(db, nombre)
+    if not dom:
+        raise HTTPException(status_code=404, detail="Dominio no encontrado")
+
+    # Consulta pre-agregada por técnica para evitar producto cartesiano
+    sql_tecnicas = text("""
+        WITH reglas_agg AS (
+            SELECT tr.tecnica_id, COUNT(tr.regla_id) AS total_reglas
+            FROM tecnica_regla tr
+            JOIN tecnica_dominio td ON tr.tecnica_id = td.tecnica_id
+            WHERE td.dominio_id = :dom_id
+            GROUP BY tr.tecnica_id
+        ),
+        controles_agg AS (
+            SELECT tc.tecnica_id, COUNT(tc.control_id) AS total_controles
+            FROM tecnica_control tc
+            JOIN tecnica_dominio td ON tc.tecnica_id = td.tecnica_id
+            WHERE td.dominio_id = :dom_id
+            GROUP BY tc.tecnica_id
+        )
+        SELECT
+            t.id AS tecnica_id,
+            t.nombre AS tecnica_nombre,
+            COALESCE(ra.total_reglas, 0) AS total_reglas,
+            CASE WHEN COALESCE(ca.total_controles, 0) > 0 THEN true ELSE false END AS tiene_controles
+        FROM tecnicas t
+        JOIN tecnica_dominio td ON t.id = td.tecnica_id
+        LEFT JOIN reglas_agg ra ON t.id = ra.tecnica_id
+        LEFT JOIN controles_agg ca ON t.id = ca.tecnica_id
+        WHERE td.dominio_id = :dom_id
+        ORDER BY total_reglas DESC, t.nombre ASC
+    """)
+    rows = db.execute(sql_tecnicas, {"dom_id": dom.id}).fetchall()
+
+    # Consulta directa de reglas únicas en el dominio
+    sql_reglas_unicas = text("""
+        SELECT COUNT(DISTINCT tr.regla_id)
+        FROM tecnica_regla tr
+        JOIN tecnica_dominio td ON tr.tecnica_id = td.tecnica_id
+        WHERE td.dominio_id = :dom_id
+    """)
+    total_reglas_unicas = db.execute(sql_reglas_unicas, {"dom_id": dom.id}).scalar() or 0
+
+    tecnicas_items = [
+        TecnicaCoberturaItem(
+            tecnica_id=r[0],
+            tecnica_nombre=r[1],
+            total_reglas=int(r[2]),
+            tiene_controles=bool(r[3]),
+        )
+        for r in rows
+    ]
+
+    total_tecnicas = len(tecnicas_items)
+    con_controles = sum(1 for t in tecnicas_items if t.tiene_controles)
+    sin_controles = total_tecnicas - con_controles
+    porcentaje = round((con_controles / total_tecnicas * 100), 1) if total_tecnicas > 0 else 0.0
+
+    return DominioCoberturaOut(
+        dominio_id=dom.id,
+        dominio_nombre=dom.nombre,
+        dominio_slug=dom.slug,
+        resumen=CoberturaResumen(
+            total_tecnicas=total_tecnicas,
+            tecnicas_con_controles=con_controles,
+            tecnicas_sin_controles=sin_controles,
+            porcentaje_con_controles=porcentaje,
+            total_reglas_unicas=int(total_reglas_unicas),
+        ),
+        tecnicas=tecnicas_items,
+    )
+

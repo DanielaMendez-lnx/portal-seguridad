@@ -178,7 +178,6 @@ def ejecutar_etl_nvd(
             vulnerabilities_raw = []
             start_index = 0
             pagina = 1
-            total_paginas = 1
 
             params = {
                 "keywordSearch": kw,
@@ -204,9 +203,6 @@ def ejecutar_etl_nvd(
                 total_results = data.get("totalResults", len(items))
                 results_per_page = data.get("resultsPerPage", params["resultsPerPage"])
                 vulnerabilities_raw.extend(items)
-
-                if total_results > 0 and results_per_page > 0:
-                    total_paginas = (total_results + results_per_page - 1) // results_per_page
 
                 print(f"    - Página {pagina}: {len(items)} CVEs devueltos. (Total disponible en NVD: {total_results})")
 

@@ -42,3 +42,27 @@ class TendenciaMesOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class TecnicaCoberturaItem(BaseModel):
+    tecnica_id: str
+    tecnica_nombre: str
+    total_reglas: int
+    tiene_controles: bool
+
+
+class CoberturaResumen(BaseModel):
+    total_tecnicas: int
+    tecnicas_con_controles: int
+    tecnicas_sin_controles: int
+    porcentaje_con_controles: float
+    total_reglas_unicas: int
+
+
+class DominioCoberturaOut(BaseModel):
+    dominio_id: int
+    dominio_nombre: str
+    dominio_slug: Optional[str] = None
+    resumen: CoberturaResumen
+    tecnicas: List[TecnicaCoberturaItem]
+
