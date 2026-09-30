@@ -61,3 +61,20 @@ async def test_dominio_vulnerabilidades_retrocompatibilidad():
         resp_tend = await client.get("/dominios/DNS/vulnerabilidades/tendencia?rango=6m")
         assert resp_tend.status_code == 200
         assert isinstance(resp_tend.json(), list)
+
+
+@pytest.mark.anyio
+async def test_dominio_iam_resolucion():
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        # Por slug
+        resp_slug = await client.get("/dominios/iam/tecnicas")
+        assert resp_slug.status_code == 200
+        tecnicas = resp_slug.json()
+        assert len(tecnicas) == 24
+
+        # Por nombre oficial
+        resp_name = await client.get("/dominios/Identity & Access Management (IAM)/tecnicas")
+        assert resp_name.status_code == 200
+        assert len(resp_name.json()) == 24
+

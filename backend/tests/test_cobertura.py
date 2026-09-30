@@ -93,6 +93,40 @@ async def test_cobertura_network_invariantes_estructurales():
 
 
 @pytest.mark.anyio
+async def test_cobertura_iam_invariantes_estructurales():
+    """
+    Verifica los invariantes estructurales de Identity & Access Management (IAM):
+    - Estado HTTP 200 y metadatos del dominio.
+    - Catálogo fijo de 24 técnicas operativas.
+    - Invariante de suma y coherencia porcentual.
+    - Orden descendente por total_reglas.
+    - Existencia de reglas únicas (> 0).
+    """
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/dominios/iam/cobertura")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["dominio_nombre"] == "Identity & Access Management (IAM)"
+        resumen = data["resumen"]
+
+        assert resumen["total_tecnicas"] == 24
+        assert len(data["tecnicas"]) == 24
+
+        con_ctrl = resumen["tecnicas_con_controles"]
+        sin_ctrl = resumen["tecnicas_sin_controles"]
+        assert con_ctrl + sin_ctrl == resumen["total_tecnicas"]
+
+        esperado_pct = round((con_ctrl / resumen["total_tecnicas"]) * 100, 1)
+        assert resumen["porcentaje_con_controles"] == esperado_pct
+
+        totales = [t["total_reglas"] for t in data["tecnicas"]]
+        assert totales == sorted(totales, reverse=True)
+        assert resumen["total_reglas_unicas"] > 0
+
+
+@pytest.mark.anyio
 async def test_cobertura_dominio_inexistente():
     """
     Verifica que la consulta a un dominio inválido devuelva HTTP 404.
@@ -102,6 +136,7 @@ async def test_cobertura_dominio_inexistente():
         response = await client.get("/dominios/dominio-que-no-existe-xyz/cobertura")
         assert response.status_code == 404
         assert response.json()["detail"] == "Dominio no encontrado"
+
 
 
 # ==============================================================================
