@@ -71,11 +71,40 @@ def parsear_vulnerabilidad(item: dict) -> Optional[NvdCveData]:
 
 
 # ==============================================================================
-# 2. CONFIGURACIÓN Y VENTANA DE FECHAS
+# 2. CONFIGURACIÓN, PERFILES DE DOMINIO Y VENTANA DE FECHAS
 # ==============================================================================
 
 NVD_MAX_RANGO_DIAS = 120
-PROTOCOLOS_DEFAULT = ["DNS", "SMB", "FTP", "DHCP", "ARP"]
+
+DOMINIOS_CONFIG = {
+    "network": {
+        "nombre": "Network Infrastructure & Protocols",
+        "slug": "network-infrastructure-protocols",
+        "keywords_default": ["DNS", "SMB", "FTP", "DHCP", "ARP"],
+        "regexes": {
+            "DNS": re.compile(r"\b(DNS|Domain Name System|BIND|DNSSEC)\b", re.IGNORECASE),
+            "SMB": re.compile(r"\b(SMB|Server Message Block|Samba|NetBIOS)\b", re.IGNORECASE),
+            "FTP": re.compile(r"\b(FTP|File Transfer Protocol|vsftpd|ProFTPD|Pure-FTPd)\b", re.IGNORECASE),
+            "DHCP": re.compile(r"\b(DHCP|Dynamic Host Configuration Protocol)\b", re.IGNORECASE),
+            "ARP": re.compile(r"\b(ARP|Address Resolution Protocol)\b", re.IGNORECASE),
+        },
+    },
+    "iam": {
+        "nombre": "Identity & Access Management (IAM)",
+        "slug": "iam",
+        "keywords_default": ["Active Directory", "Kerberos", "LDAP", "SAML", "ADFS"],
+        "regexes": {
+            "Active Directory": re.compile(r"\b(Active Directory|AD DS|Domain Controller|Netlogon|MS-NRPC)\b", re.IGNORECASE),
+            "Kerberos": re.compile(r"\b(Kerberos|KRB5|Ticket Granting|KDC|AS-REP|TGS)\b", re.IGNORECASE),
+            "LDAP": re.compile(r"\b(LDAP|Lightweight Directory Access Protocol|OpenLDAP|slapd)\b", re.IGNORECASE),
+            "SAML": re.compile(r"\b(SAML|Security Assertion Markup Language|Shibboleth|SimpleSAMLphp)\b", re.IGNORECASE),
+            "ADFS / Federation": re.compile(r"\b(ADFS|Active Directory Federation Services|Federation)\b", re.IGNORECASE),
+        },
+    },
+}
+
+# Alias retrocompatibles
+PROTOCOLOS_DEFAULT = DOMINIOS_CONFIG["network"]["keywords_default"]
 
 
 def calcular_ventana_fechas(modo: str, dias_override: Optional[int] = None) -> tuple[datetime, datetime]:
@@ -134,23 +163,36 @@ def consultar_nvd_con_reintento(
 
 def ejecutar_etl_nvd(
     modo: str = "incremental",
+    dominio: str = "network",
     keywords: Optional[List[str]] = None,
     dias_override: Optional[int] = None,
     limit_per_keyword: int = 50,
 ):
-    keywords_a_consultar = keywords or PROTOCOLOS_DEFAULT
+    dom_key = dominio.lower()
+    if dom_key not in DOMINIOS_CONFIG:
+        match = next(
+            (k for k, v in DOMINIOS_CONFIG.items() if v["slug"] == dom_key or v["nombre"].lower() == dom_key),
+            None,
+        )
+        dom_key = match if match else "network"
+
+    config_dom = DOMINIOS_CONFIG[dom_key]
+    nombre_dominio = config_dom["nombre"]
+    slug_dominio = config_dom["slug"]
+    keywords_a_consultar = keywords or config_dom["keywords_default"]
 
     with sesion_etl() as db:
+        print(f"[*] Dominio objetivo: '{nombre_dominio}' (slug: {slug_dominio})")
         print(f"[*] Modo de ejecución: {modo}")
         print(f"[*] Protocolos / Palabras clave a consultar: {', '.join(keywords_a_consultar)}")
 
         fuente_id = asegurar_fuente(db, "NVD")
         dominio_id = asegurar_dominio(
             db,
-            nombre="Network Infrastructure & Protocols",
-            slug="network-infrastructure-protocols",
+            nombre=nombre_dominio,
+            slug=slug_dominio,
         )
-        print(f"[*] Sincronizando fuente NVD (ID: {fuente_id}) y dominio 'Network Infrastructure & Protocols' (ID: {dominio_id}) en Neon...")
+        print(f"[*] Sincronizando fuente NVD (ID: {fuente_id}) y dominio '{nombre_dominio}' (ID: {dominio_id}) en Neon...")
 
         api_url = CONFIG_FUENTES["NVD"]["url"]
         api_key = os.getenv("NVD_API_KEY")
@@ -263,7 +305,7 @@ def ejecutar_etl_nvd(
 
             resumen_ingesta[kw]["insertados"] = insertados_kw
             total_insertados_sesion += insertados_kw
-            print(f"    -> {insertados_kw} CVEs vinculados exitosamente a 'Network Infrastructure & Protocols'.")
+            print(f"    -> {insertados_kw} CVEs vinculados exitosamente a '{nombre_dominio}'.")
 
             # Pausa de cortesía entre diferentes keywords
             if idx < len(keywords_a_consultar):
@@ -275,11 +317,14 @@ def ejecutar_etl_nvd(
         # ==============================================================================
         # 4. REPORTE CONSOLIDADO POR PROTOCOLO EN NEON
         # ==============================================================================
-        reportar_estado_consolidado(db, dominio_id)
+        reportar_estado_consolidado(db, dominio_id, dom_key)
 
 
-def reportar_estado_consolidado(db, dominio_id: int):
+def reportar_estado_consolidado(db, dominio_id: int, dominio_key: str = "network"):
     """Genera y muestra el desglose analítico de todos los CVEs catalogados en el dominio."""
+    dom_obj = db.query(Dominio).filter(Dominio.id == dominio_id).first()
+    nombre_dominio = dom_obj.nombre if dom_obj else f"ID {dominio_id}"
+
     cves_dominio = (
         db.query(Vulnerabilidad)
         .join(Vulnerabilidad.dominios)
@@ -288,14 +333,8 @@ def reportar_estado_consolidado(db, dominio_id: int):
     )
 
     total_cves = len(cves_dominio)
-
-    regexes = {
-        "DNS": re.compile(r"\b(DNS|Domain Name System|BIND|DNSSEC)\b", re.IGNORECASE),
-        "SMB": re.compile(r"\b(SMB|Server Message Block|Samba|NetBIOS)\b", re.IGNORECASE),
-        "FTP": re.compile(r"\b(FTP|File Transfer Protocol|vsftpd|ProFTPD|Pure-FTPd)\b", re.IGNORECASE),
-        "DHCP": re.compile(r"\b(DHCP|Dynamic Host Configuration Protocol)\b", re.IGNORECASE),
-        "ARP": re.compile(r"\b(ARP|Address Resolution Protocol)\b", re.IGNORECASE),
-    }
+    cfg = DOMINIOS_CONFIG.get(dominio_key, DOMINIOS_CONFIG["network"])
+    regexes = cfg["regexes"]
 
     conteos = {p: 0 for p in regexes}
     conteos["General / Otros"] = 0
@@ -311,20 +350,26 @@ def reportar_estado_consolidado(db, dominio_id: int):
             conteos["General / Otros"] += 1
 
     print("\n" + "=" * 65)
-    print(" ESTADO CONSOLIDADO DEL DOMINIO 'Network Infrastructure & Protocols'")
+    print(f" ESTADO CONSOLIDADO DEL DOMINIO '{nombre_dominio}'")
     print("=" * 65)
     print(f"Total CVEs catalogados en Neon: {total_cves}")
     print("-" * 65)
-    print(f"{'Protocolo':<20} | {'CVEs Asignados':<15} | {'Porcentaje':<10}")
+    print(f"{'Categoría / Protocolo':<25} | {'CVEs Asignados':<15} | {'Porcentaje':<10}")
     print("-" * 65)
     for proto, cnt in conteos.items():
         pct = (cnt / total_cves * 100) if total_cves > 0 else 0
-        print(f"{proto:<20} | {cnt:<15} | {pct:>6.1f}%")
+        print(f"{proto:<25} | {cnt:<15} | {pct:>6.1f}%")
     print("=" * 65 + "\n")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="ETL de ingesta de CVEs desde NVD para Network Infrastructure & Protocols.")
+    parser = argparse.ArgumentParser(description="ETL de ingesta de CVEs desde NVD para dominios de ciberseguridad.")
+    parser.add_argument(
+        "--dominio",
+        choices=["network", "iam"],
+        default="network",
+        help="Dominio objetivo para la ingesta ('network' o 'iam'). Por defecto: 'network'.",
+    )
     parser.add_argument(
         "--modo",
         choices=["backfill", "incremental"],
@@ -341,7 +386,7 @@ if __name__ == "__main__":
         "--keywords",
         nargs="+",
         default=None,
-        help="Lista de palabras clave/protocolos a consultar (por defecto: DNS SMB FTP DHCP ARP).",
+        help="Lista de palabras clave/protocolos a consultar (por defecto según dominio).",
     )
     parser.add_argument(
         "--limit-per-keyword",
@@ -353,6 +398,7 @@ if __name__ == "__main__":
 
     ejecutar_etl_nvd(
         modo=args.modo,
+        dominio=args.dominio,
         keywords=args.keywords,
         dias_override=args.dias,
         limit_per_keyword=args.limit_per_keyword,
