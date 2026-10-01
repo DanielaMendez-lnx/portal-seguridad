@@ -180,6 +180,8 @@ export default async function IamDashboardPage() {
           apiBase={API_BASE}
           initialData={tendenciaInicial}
           dominioSlug="iam"
+          titulo="CVEs de IAM Divulgados por Mes"
+          descripcionFuente="Frecuencia de vulnerabilidades en protocolos de autenticación, servicios de directorio y control de acceso (Active Directory, Kerberos, LDAP, NTLM, SAML) publicadas formalmente en NVD según su fecha oficial de divulgación."
         />
 
         {/* 5. Tabla de Vulnerabilidades NVD Paginada y Expandible */}
@@ -188,6 +190,7 @@ export default async function IamDashboardPage() {
           total={totalCves}
           apiBase={API_BASE}
           dominioSlug="iam"
+          titulo="Vulnerabilidades de IAM Recientes (NVD)"
         />
       </div>
     </main>

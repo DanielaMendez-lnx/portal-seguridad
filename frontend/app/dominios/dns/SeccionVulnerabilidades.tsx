@@ -17,6 +17,7 @@ interface Props {
   total: number;
   apiBase: string;
   dominioSlug: string;
+  titulo: string;
 }
 
 export default function SeccionVulnerabilidades({
@@ -24,6 +25,7 @@ export default function SeccionVulnerabilidades({
   total,
   apiBase,
   dominioSlug,
+  titulo,
 }: Props) {
   const [cves, setCves] = useState<Vulnerabilidad[]>(initialCves);
   const [totalCves, setTotalCves] = useState<number>(total);
@@ -83,7 +85,7 @@ export default function SeccionVulnerabilidades({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-lg font-bold text-umbra-ink">Vulnerabilidades de Red Recientes (NVD)</h2>
+            <h2 className="text-lg font-bold text-umbra-ink">{titulo}</h2>
             <a
               href="https://nvd.nist.gov/"
               target="_blank"

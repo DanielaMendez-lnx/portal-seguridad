@@ -20,12 +20,16 @@ export interface TendenciaMes {
 interface Props {
   apiBase: string;
   dominioSlug: string;
+  titulo: string;
+  descripcionFuente: string;
   initialData?: TendenciaMes[];
 }
 
 export default function GraficoTendenciaCVEs({
   apiBase,
   dominioSlug,
+  titulo,
+  descripcionFuente,
   initialData = [],
 }: Props) {
   const [rango, setRango] = useState<"6m" | "1y">("6m");
@@ -82,7 +86,7 @@ export default function GraficoTendenciaCVEs({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-lg font-bold text-umbra-ink">CVEs de Red Divulgados por Mes</h2>
+            <h2 className="text-lg font-bold text-umbra-ink">{titulo}</h2>
             <a
               href="https://nvd.nist.gov/"
               target="_blank"
@@ -93,7 +97,7 @@ export default function GraficoTendenciaCVEs({
             </a>
           </div>
           <p className="text-xs text-umbra-ink-dim mt-0.5">
-            Frecuencia de vulnerabilidades de infraestructura y protocolos de red (DNS, SMB, FTP, servicios L2/L3) publicadas formalmente en NVD según su fecha oficial de divulgación.
+            {descripcionFuente}
           </p>
         </div>
 

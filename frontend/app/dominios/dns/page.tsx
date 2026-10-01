@@ -2,11 +2,21 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Límite máximo en Vercel Hobby (60 segundos)
 
 import Link from "next/link";
-import { ArrowLeft, ShieldAlert, AlertTriangle, ShieldCheck, Activity } from "lucide-react";
+import { ArrowLeft, Network } from "lucide-react";
+import CoberturaCards, { CoberturaResumen } from "../components/CoberturaCards";
+import GraficoReglasPorTecnica, { TecnicaCoberturaItem } from "../components/GraficoReglasPorTecnica";
+import SeccionTecnicas, { Tecnica } from "./SeccionTecnicas";
 import GraficoSeveridad from "./GraficoSeveridad";
 import GraficoTendenciaCVEs, { TendenciaMes } from "./GraficoTendenciaCVEs";
-import SeccionTecnicas, { Tecnica } from "./SeccionTecnicas";
 import SeccionVulnerabilidades, { Vulnerabilidad } from "./SeccionVulnerabilidades";
+
+interface CoberturaResponse {
+  dominio_id: number;
+  dominio_nombre: string;
+  dominio_slug: string;
+  resumen: CoberturaResumen;
+  tecnicas: TecnicaCoberturaItem[];
+}
 
 interface VulnerabilidadesResponse {
   total: number;
@@ -60,6 +70,14 @@ async function getTecnicas(): Promise<Tecnica[]> {
   return await res.json();
 }
 
+async function getCobertura(): Promise<CoberturaResponse> {
+  const res = await fetchWithTimeoutAndDebugDelay(`${API_BASE}/dominios/DNS/cobertura`);
+  if (!res.ok) {
+    throw new Error(`Error en el servidor al obtener cobertura (${res.status})`);
+  }
+  return await res.json();
+}
+
 async function getVulnerabilidades(): Promise<VulnerabilidadesResponse> {
   const res = await fetchWithTimeoutAndDebugDelay(`${API_BASE}/dominios/DNS/vulnerabilidades`);
   if (!res.ok) {
@@ -78,8 +96,9 @@ async function getTendenciaInicial(): Promise<TendenciaMes[]> {
 
 export default async function DnsDashboardPage() {
   // Carga concurrente con Promise.allSettled
-  const [tecnicasRes, cvesRes, tendenciaRes] = await Promise.allSettled([
+  const [tecnicasRes, coberturaRes, cvesRes, tendenciaRes] = await Promise.allSettled([
     getTecnicas(),
+    getCobertura(),
     getVulnerabilidades(),
     getTendenciaInicial(),
   ]);
@@ -92,6 +111,23 @@ export default async function DnsDashboardPage() {
   const tecnicas = tecnicasRes.value;
 
   // 2. Fetches secundarios (resilientes): si fallan, se proporcionan valores por defecto y no se tumba la página completa
+  const cobertura: CoberturaResponse =
+    coberturaRes.status === "fulfilled"
+      ? coberturaRes.value
+      : {
+          dominio_id: 1,
+          dominio_nombre: "Network Infrastructure & Protocols",
+          dominio_slug: "network-infrastructure-protocols",
+          resumen: {
+            total_tecnicas: tecnicas.length,
+            tecnicas_con_controles: 0,
+            tecnicas_sin_controles: tecnicas.length,
+            porcentaje_con_controles: 0,
+            total_reglas_unicas: 0,
+          },
+          tecnicas: [],
+        };
+
   const cvesData: VulnerabilidadesResponse =
     cvesRes.status === "fulfilled"
       ? cvesRes.value
@@ -105,22 +141,10 @@ export default async function DnsDashboardPage() {
   const cves = cvesData.items;
   const totalCves = cvesData.total;
 
-  // Contar controles y reglas únicos
-  const totalControles = new Set(tecnicas.flatMap((t) => t.controles.map((c) => c.codigo))).size;
-  const totalReglas = new Set(tecnicas.flatMap((t) => t.reglas.map((r) => r.id))).size;
-
-  // Promedio CVSS
-  const scoresValidos = cves
-    .filter((c) => c.cvss_score !== null)
-    .map((c) => c.cvss_score as number);
-  const promedioCvss =
-    scoresValidos.length > 0
-      ? (scoresValidos.reduce((a, b) => a + b, 0) / scoresValidos.length).toFixed(1)
-      : "N/A";
-
   return (
     <main className="min-h-screen bg-umbra-bg text-umbra-ink p-8 md:p-16">
       <div className="max-w-6xl mx-auto">
+        {/* Navegación superior */}
         <div className="flex items-center justify-between gap-4 mb-8">
           <Link
             href="/dominios"
@@ -137,9 +161,12 @@ export default async function DnsDashboardPage() {
           </Link>
         </div>
 
-        {/* Encabezado */}
+        {/* 1. Encabezado del Dominio */}
         <header className="mb-10 pb-8 border-b border-umbra-line">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <div className="p-2 bg-umbra-cyan/10 text-umbra-cyan border border-umbra-cyan/30 rounded-lg">
+              <Network className="w-5 h-5" />
+            </div>
             <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-umbra-ink">
               Dominio: Network Infrastructure & Protocols
             </h1>
@@ -147,66 +174,46 @@ export default async function DnsDashboardPage() {
               En Producción
             </span>
           </div>
-          <p className="text-umbra-ink-dim max-w-3xl">
+          <p className="text-umbra-ink-dim max-w-3xl text-sm leading-relaxed">
             Correlación analítica entre técnicas de ataque MITRE ATT&CK, marcos de mitigación NIST SP 800-53,
             reglas de detección SigmaHQ y vulnerabilidades para DNS, SMB, FTP, Servicios L2/L3 y Tráfico de Red.
           </p>
         </header>
 
-        {/* Contadores dinámicos */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          <div className="bg-umbra-surface border border-umbra-line p-5 rounded-xl">
-            <div className="flex items-center justify-between text-umbra-ink-dim mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Técnicas ATT&CK</span>
-              <Activity className="w-4 h-4 text-umbra-cyan" />
-            </div>
-            <p className="text-2xl font-bold text-umbra-ink">{tecnicas.length}</p>
-          </div>
+        {/* 2. Cobertura de Seguridad: 4 tarjetas KPI integradas */}
+        <CoberturaCards resumen={cobertura.resumen} totalCves={totalCves} />
 
-          <div className="bg-umbra-surface border border-umbra-line p-5 rounded-xl">
-            <div className="flex items-center justify-between text-umbra-ink-dim mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Controles NIST</span>
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            </div>
-            <p className="text-2xl font-bold text-umbra-ink">{totalControles}</p>
-          </div>
+        {/* 3. Analítica de Detección: Reglas SigmaHQ por Técnica ATT&CK */}
+        <GraficoReglasPorTecnica
+          tecnicas={cobertura.tecnicas}
+          dominioNombre="Network Infrastructure & Protocols"
+        />
 
-          <div className="bg-umbra-surface border border-umbra-line p-5 rounded-xl">
-            <div className="flex items-center justify-between text-umbra-ink-dim mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Reglas Sigma</span>
-              <ShieldAlert className="w-4 h-4 text-umbra-cyan" />
-            </div>
-            <p className="text-2xl font-bold text-umbra-ink">{totalReglas}</p>
-          </div>
-
-          <div className="bg-umbra-surface border border-umbra-line p-5 rounded-xl">
-            <div className="flex items-center justify-between text-umbra-ink-dim mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">CVSS Promedio</span>
-              <AlertTriangle className="w-4 h-4 text-amber-400" />
-            </div>
-            <p className="text-2xl font-bold text-umbra-ink">{promedioCvss}</p>
-          </div>
-        </div>
-
-        {/* Gráfico de distribución CVSS */}
-        <GraficoSeveridad cves={cves} />
-
-        {/* Gráfico de tendencia temporal de CVEs divulgados */}
-        <GraficoTendenciaCVEs apiBase={API_BASE} initialData={tendenciaInicial} dominioSlug="DNS" />
-
-        {/* Matriz MITRE ATT&CK + NIST + Sigma */}
+        {/* 4. Matriz interactiva MITRE ATT&CK + NIST SP 800-53 + SigmaHQ */}
         <SeccionTecnicas
           tecnicas={tecnicas}
           dominioCodigo="NET-INFRA"
           dominioNombre="Network Infrastructure & Protocols"
         />
 
-        {/* Tabla de vulnerabilidades recientes con paginación y filas expandibles */}
+        {/* 5. Analítica de Vulnerabilidades: Severidad CVSS y Tendencia Temporal */}
+        <GraficoSeveridad cves={cves} />
+
+        <GraficoTendenciaCVEs
+          apiBase={API_BASE}
+          initialData={tendenciaInicial}
+          dominioSlug="DNS"
+          titulo="CVEs de Red Divulgados por Mes"
+          descripcionFuente="Frecuencia de vulnerabilidades de infraestructura y protocolos de red (DNS, SMB, FTP, servicios L2/L3) publicadas formalmente en NVD según su fecha oficial de divulgación."
+        />
+
+        {/* 6. Tabla de Vulnerabilidades NVD Paginada y Expandible */}
         <SeccionVulnerabilidades
           initialCves={cves}
           total={totalCves}
           apiBase={API_BASE}
           dominioSlug="DNS"
+          titulo="Vulnerabilidades de Red Recientes (NVD)"
         />
       </div>
     </main>
