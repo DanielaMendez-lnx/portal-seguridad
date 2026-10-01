@@ -192,7 +192,7 @@ export default async function DnsDashboardPage() {
         <GraficoSeveridad cves={cves} />
 
         {/* Gráfico de tendencia temporal de CVEs divulgados */}
-        <GraficoTendenciaCVEs apiBase={API_BASE} initialData={tendenciaInicial} />
+        <GraficoTendenciaCVEs apiBase={API_BASE} initialData={tendenciaInicial} dominioSlug="DNS" />
 
         {/* Matriz MITRE ATT&CK + NIST + Sigma */}
         <SeccionTecnicas
@@ -206,6 +206,7 @@ export default async function DnsDashboardPage() {
           initialCves={cves}
           total={totalCves}
           apiBase={API_BASE}
+          dominioSlug="DNS"
         />
       </div>
     </main>

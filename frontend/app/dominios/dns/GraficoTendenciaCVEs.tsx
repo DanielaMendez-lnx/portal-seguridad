@@ -19,10 +19,15 @@ export interface TendenciaMes {
 
 interface Props {
   apiBase: string;
+  dominioSlug: string;
   initialData?: TendenciaMes[];
 }
 
-export default function GraficoTendenciaCVEs({ apiBase, initialData = [] }: Props) {
+export default function GraficoTendenciaCVEs({
+  apiBase,
+  dominioSlug,
+  initialData = [],
+}: Props) {
   const [rango, setRango] = useState<"6m" | "1y">("6m");
   const [datos, setDatos] = useState<TendenciaMes[]>(initialData);
   const [cargando, setCargando] = useState<boolean>(false);
@@ -33,7 +38,7 @@ export default function GraficoTendenciaCVEs({ apiBase, initialData = [] }: Prop
     setCargando(true);
     setError(null);
     try {
-      const res = await fetch(`${apiBase}/dominios/DNS/vulnerabilidades/tendencia?rango=${rangoTarget}`, {
+      const res = await fetch(`${apiBase}/dominios/${dominioSlug}/vulnerabilidades/tendencia?rango=${rangoTarget}`, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error("Error al obtener tendencia de vulnerabilidades");

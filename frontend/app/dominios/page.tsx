@@ -88,24 +88,33 @@ export default function DominiosCatalogPage() {
             </div>
           </Link>
 
-          {/* Tarjeta Cloud IAM (Placeholder) */}
-          <div className="bg-umbra-surface/40 border border-umbra-line p-6 rounded-2xl opacity-60 flex flex-col justify-between">
+          {/* Tarjeta Identity & Access Management (IAM) (Activa) */}
+          <Link
+            href="/dominios/iam"
+            className="group relative bg-umbra-surface border border-umbra-line hover:border-umbra-cyan/50 p-6 rounded-2xl transition-all hover:shadow-xl hover:shadow-umbra-cyan/10 flex flex-col justify-between"
+          >
             <div>
               <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-umbra-surface text-umbra-ink-muted border border-umbra-line rounded-xl">
+                <div className="p-3 bg-umbra-cyan/10 text-umbra-cyan border border-umbra-cyan/30 rounded-xl">
                   <Key className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-semibold px-2.5 py-1 bg-umbra-surface text-umbra-ink-muted border border-umbra-line rounded-full">
-                  Próximamente
+                <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800/60 rounded-full">
+                  Activo
                 </span>
               </div>
-              <h2 className="text-xl font-bold mb-2 text-umbra-ink">Identidad & Cloud IAM</h2>
+              <h2 className="text-xl font-bold mb-2 text-umbra-ink group-hover:text-umbra-cyan transition-colors">
+                Identity & Access Management (IAM)
+              </h2>
               <p className="text-sm text-umbra-ink-dim leading-relaxed mb-6">
-                Escalamiento de privilegios en nubes públicas, abuso de roles asumidos y tokens de sesión.
+                Ataques a Active Directory, Kerberoasting, AS-REP Roasting, DCSync, fuerza bruta y password spraying, abuso de cuentas válidas y vectores en Kerberos, LDAP, NTLM y SAML.
               </p>
             </div>
-            <span className="text-xs text-umbra-ink-muted">En desarrollo</span>
-          </div>
+
+            <div className="flex items-center text-sm font-medium text-umbra-cyan gap-1.5 group-hover:translate-x-1 transition-transform">
+              Entrar al Dashboard
+              <ArrowRight className="w-4 h-4" />
+            </div>
+          </Link>
         </div>
       </div>
     </main>

@@ -16,9 +16,15 @@ interface Props {
   initialCves: Vulnerabilidad[];
   total: number;
   apiBase: string;
+  dominioSlug: string;
 }
 
-export default function SeccionVulnerabilidades({ initialCves, total, apiBase }: Props) {
+export default function SeccionVulnerabilidades({
+  initialCves,
+  total,
+  apiBase,
+  dominioSlug,
+}: Props) {
   const [cves, setCves] = useState<Vulnerabilidad[]>(initialCves);
   const [totalCves, setTotalCves] = useState<number>(total);
   const [offset, setOffset] = useState<number>(initialCves.length);
@@ -52,7 +58,7 @@ export default function SeccionVulnerabilidades({ initialCves, total, apiBase }:
     setCargando(true);
     setError(null);
     try {
-      const res = await fetch(`${apiBase}/dominios/DNS/vulnerabilidades?limit=40&offset=${offset}`);
+      const res = await fetch(`${apiBase}/dominios/${dominioSlug}/vulnerabilidades?limit=40&offset=${offset}`);
       if (!res.ok) {
         throw new Error(`Error en el servidor: ${res.status}`);
       }
