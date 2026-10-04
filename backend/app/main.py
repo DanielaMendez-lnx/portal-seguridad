@@ -11,7 +11,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from app.routers import dominios, tecnicas
+from app.routers import dominios, reglas, tecnicas
 
 load_dotenv()
 
@@ -108,6 +108,7 @@ app.add_middleware(
 
 app.include_router(dominios.router)
 app.include_router(tecnicas.router)
+app.include_router(reglas.router)
 
 @app.get("/")
 @limiter.exempt

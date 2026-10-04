@@ -152,6 +152,25 @@ class ReglaDeteccion(Base):
 
     fuente = relationship("Fuente", back_populates="reglas")
     tecnicas = relationship("Tecnica", secondary=tecnica_regla, back_populates="reglas")
+    traducciones = relationship("ReglaTraduccion", back_populates="regla", cascade="all, delete-orphan")
+
+
+class ReglaTraduccion(Base):
+    __tablename__ = "reglas_traducciones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    regla_id = Column(Integer, ForeignKey("reglas_deteccion.id", ondelete="CASCADE"), nullable=False, index=True)
+    formato = Column(String(30), nullable=False)
+    query = Column(Text, nullable=False)
+    flavor_label = Column(String(100), nullable=True)
+    target_table = Column(String(100), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("regla_id", "formato", name="uq_regla_formato_traduccion"),
+    )
+
+    regla = relationship("ReglaDeteccion", back_populates="traducciones")
+
 
 
 class ReporteAmenaza(Base):

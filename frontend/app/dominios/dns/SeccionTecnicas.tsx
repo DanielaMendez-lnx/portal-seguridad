@@ -2,7 +2,19 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ShieldCheck, Terminal, Search, ChevronDown, ChevronUp, Star } from "lucide-react";
+import {
+  ShieldCheck,
+  Terminal,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  Star,
+  Copy,
+  Check,
+  Loader2,
+  X,
+  Code2,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useFavoritos, type InputNuevoFavorito } from "../../hooks/useFavoritos";
 
@@ -22,6 +34,15 @@ export interface Regla {
   log_source: string | null;
   url_fuente?: string | null;
 }
+
+export interface ReglaTraduccion {
+  formato: string;
+  query: string;
+  flavor_label?: string | null;
+  target_table?: string | null;
+}
+
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 export interface Tecnica {
   id: string;
@@ -82,6 +103,15 @@ function ListaReglasSigma({
   const [busqueda, setBusqueda] = useState("");
   const [mostrarTodas, setMostrarTodas] = useState(false);
 
+  // Estados locales para traducciones on-demand y expansión de panel
+  const [traduccionesCache, setTraduccionesCache] = useState<Record<number, ReglaTraduccion[]>>({});
+  const [reglaExpandidaId, setReglaExpandidaId] = useState<number | null>(null);
+  const [formatoActivo, setFormatoActivo] = useState<"splunk" | "elastic" | "kql">("splunk");
+  const [kqlFlavor, setKqlFlavor] = useState<"defender" | "sentinel">("defender");
+  const [cargandoId, setCargandoId] = useState<number | null>(null);
+  const [errorId, setErrorId] = useState<number | null>(null);
+  const [copiadoKey, setCopiadoKey] = useState<string | null>(null);
+
   // Ordenar alfabéticamente A-Z de forma determinista
   const reglasOrdenadas = useMemo(() => {
     return [...reglas].sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -105,6 +135,77 @@ function ListaReglasSigma({
       : reglasFiltradas.slice(0, UMBRAL_PAGINACION_REGLAS);
 
   const hayMasPorMostrar = !mostrarTodas && tieneMuchasReglas && reglasFiltradas.length > UMBRAL_PAGINACION_REGLAS;
+
+  const handleToggleFormato = async (
+    reglaId: number,
+    formato: "splunk" | "elastic" | "kql",
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+
+    // Si ya está expandida con este mismo formato, colapsamos
+    if (reglaExpandidaId === reglaId && formatoActivo === formato) {
+      setReglaExpandidaId(null);
+      return;
+    }
+
+    setReglaExpandidaId(reglaId);
+    setFormatoActivo(formato);
+    setErrorId(null);
+
+    // Si ya está en caché
+    if (traduccionesCache[reglaId] !== undefined) {
+      if (formato === "kql") {
+        const trads = traduccionesCache[reglaId];
+        const tieneDefender = trads.some((t) => t.formato === "kql_defender");
+        setKqlFlavor(tieneDefender ? "defender" : "sentinel");
+      }
+      return;
+    }
+
+    // Consultar API on-demand
+    setCargandoId(reglaId);
+    try {
+      const res = await fetch(`${API_BASE}/reglas/${reglaId}/traducciones`);
+      if (!res.ok) {
+        throw new Error(`Error ${res.status}`);
+      }
+      const data: ReglaTraduccion[] = await res.json();
+      setTraduccionesCache((prev) => ({ ...prev, [reglaId]: data }));
+
+      if (formato === "kql") {
+        const tieneDefender = data.some((t) => t.formato === "kql_defender");
+        setKqlFlavor(tieneDefender ? "defender" : "sentinel");
+      }
+    } catch (err) {
+      console.error(`Error al cargar traducciones para regla ${reglaId}:`, err);
+      setErrorId(reglaId);
+    } finally {
+      setCargandoId(null);
+    }
+  };
+
+  const handleCopiarQuery = async (texto: string, clave: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(texto);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = texto;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+      setCopiadoKey(clave);
+      setTimeout(() => {
+        setCopiadoKey((prev) => (prev === clave ? null : prev));
+      }, 2000);
+    } catch (err) {
+      console.error("Error al copiar al portapapeles:", err);
+    }
+  };
 
   return (
     <div className="bg-umbra-surface/80 border border-umbra-line p-3.5 rounded-lg flex flex-col">
@@ -180,65 +281,315 @@ function ListaReglasSigma({
         <ul className="space-y-1.5">
           {reglasVisibles.map((r) => {
             const favorita = esFavorito(r.id, tecnicaId);
+            const estaExpandida = reglaExpandidaId === r.id;
+            const trads = traduccionesCache[r.id];
+            const yaConsultada = trads !== undefined;
+            const sinTraducciones = yaConsultada && trads.length === 0;
+
+            // Extraer traducciones específicas si ya están en caché
+            const tradSplunk = trads?.find((t) => t.formato === "splunk");
+            const tradElastic = trads?.find((t) => t.formato === "elastic");
+            const tradDefender = trads?.find((t) => t.formato === "kql_defender");
+            const tradSentinel = trads?.find((t) => t.formato === "kql_sentinel");
+
+            // Determinar la traducción activa actual para el panel
+            let tradActual: ReglaTraduccion | undefined;
+            if (formatoActivo === "splunk") {
+              tradActual = tradSplunk;
+            } else if (formatoActivo === "elastic") {
+              tradActual = tradElastic;
+            } else if (formatoActivo === "kql") {
+              tradActual = (kqlFlavor === "defender" && tradDefender) ? tradDefender : (tradSentinel || tradDefender);
+            }
+
             return (
               <li
                 key={r.id}
-                className="text-xs text-umbra-ink flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-1.5 rounded hover:bg-umbra-surface-hover/60 transition-colors"
+                className={`text-xs text-umbra-ink flex flex-col p-2 rounded-lg transition-all duration-150 ${
+                  estaExpandida
+                    ? "bg-umbra-surface/95 border border-umbra-cyan/40 shadow-sm shadow-umbra-cyan/10 ring-1 ring-umbra-cyan/20"
+                    : "bg-transparent border border-transparent hover:bg-umbra-surface-hover/60"
+                }`}
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorito({
-                        regla_id: r.id,
-                        regla_nombre: r.nombre,
-                        regla_formato: r.formato,
-                        url_fuente: r.url_fuente ?? null,
-                        tecnica_id: tecnicaId,
-                        tecnica_nombre: tecnicaNombre,
-                        dominio_codigo: dominioCodigo,
-                        dominio_nombre: dominioNombre,
-                      });
-                    }}
-                    className={`p-1 rounded-md transition-colors shrink-0 focus:outline-none focus:ring-1 focus:ring-amber-400/50 ${
-                      favorita
-                        ? "text-amber-400 hover:text-amber-300"
-                        : "text-umbra-ink-muted hover:text-amber-300 hover:bg-umbra-surface"
-                    }`}
-                    title={
-                      favorita
-                        ? `Quitar regla de repertorio (${tecnicaId})`
-                        : `Guardar regla en repertorio (${tecnicaId})`
-                    }
-                    aria-label={
-                      favorita
-                        ? `Quitar ${r.nombre} de favoritos en técnica ${tecnicaId}`
-                        : `Guardar ${r.nombre} en favoritos en técnica ${tecnicaId}`
-                    }
-                  >
-                    <Star
-                      className={`w-3.5 h-3.5 transition-transform active:scale-125 ${
-                        favorita ? "fill-amber-400 stroke-amber-400" : "stroke-current fill-none"
+                {/* Fila principal de la regla */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorito({
+                          regla_id: r.id,
+                          regla_nombre: r.nombre,
+                          regla_formato: r.formato,
+                          url_fuente: r.url_fuente ?? null,
+                          tecnica_id: tecnicaId,
+                          tecnica_nombre: tecnicaNombre,
+                          dominio_codigo: dominioCodigo,
+                          dominio_nombre: dominioNombre,
+                        });
+                      }}
+                      className={`p-1 rounded-md transition-colors shrink-0 focus:outline-none focus:ring-1 focus:ring-amber-400/50 ${
+                        favorita
+                          ? "text-amber-400 hover:text-amber-300"
+                          : "text-umbra-ink-muted hover:text-amber-300 hover:bg-umbra-surface"
                       }`}
-                    />
-                  </button>
+                      title={
+                        favorita
+                          ? `Quitar regla de repertorio (${tecnicaId})`
+                          : `Guardar regla en repertorio (${tecnicaId})`
+                      }
+                      aria-label={
+                        favorita
+                          ? `Quitar ${r.nombre} de favoritos en técnica ${tecnicaId}`
+                          : `Guardar ${r.nombre} en favoritos en técnica ${tecnicaId}`
+                      }
+                    >
+                      <Star
+                        className={`w-3.5 h-3.5 transition-transform active:scale-125 ${
+                          favorita ? "fill-amber-400 stroke-amber-400" : "stroke-current fill-none"
+                        }`}
+                      />
+                    </button>
 
-                  <span className="font-mono text-[10px] text-umbra-cyan bg-umbra-cyan/10 border border-umbra-cyan/30 px-1.5 py-0.5 rounded shrink-0">
-                    {r.formato}
-                  </span>
-                  <span className="leading-snug truncate" title={r.nombre}>{r.nombre}</span>
+                    <span className="font-mono text-[10px] text-umbra-cyan bg-umbra-cyan/10 border border-umbra-cyan/30 px-1.5 py-0.5 rounded shrink-0">
+                      {r.formato}
+                    </span>
+                    <span
+                      className={`leading-snug truncate ${estaExpandida ? "font-semibold text-umbra-ink" : ""}`}
+                      title={r.nombre}
+                    >
+                      {r.nombre}
+                    </span>
+                  </div>
+
+                  {/* Acciones: Badges de SIEM/XDR y enlace a fuente */}
+                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto flex-wrap">
+                    {/* Botón Splunk */}
+                    <button
+                      type="button"
+                      disabled={sinTraducciones}
+                      onClick={(e) => handleToggleFormato(r.id, "splunk", e)}
+                      title={
+                        sinTraducciones
+                          ? "Sin traducciones disponibles para esta regla"
+                          : estaExpandida && formatoActivo === "splunk"
+                          ? "Ocultar consulta Splunk"
+                          : "Ver consulta Splunk SPL"
+                      }
+                      className={`font-mono text-[10px] px-2 py-0.5 rounded border transition-all cursor-pointer inline-flex items-center gap-1 ${
+                        estaExpandida && formatoActivo === "splunk"
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/60 font-bold shadow-sm shadow-amber-500/10"
+                          : sinTraducciones
+                          ? "bg-umbra-bg/40 text-umbra-ink-muted/50 border-umbra-line/40 opacity-40 cursor-not-allowed"
+                          : "bg-umbra-bg text-umbra-ink-dim border-umbra-line hover:text-amber-300 hover:border-amber-500/40 hover:bg-umbra-surface"
+                      }`}
+                    >
+                      {cargandoId === r.id && formatoActivo === "splunk" ? (
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      ) : null}
+                      Splunk
+                    </button>
+
+                    {/* Botón Elastic */}
+                    <button
+                      type="button"
+                      disabled={sinTraducciones}
+                      onClick={(e) => handleToggleFormato(r.id, "elastic", e)}
+                      title={
+                        sinTraducciones
+                          ? "Sin traducciones disponibles para esta regla"
+                          : estaExpandida && formatoActivo === "elastic"
+                          ? "Ocultar consulta Elasticsearch"
+                          : "Ver consulta Elasticsearch Lucene (ECS)"
+                      }
+                      className={`font-mono text-[10px] px-2 py-0.5 rounded border transition-all cursor-pointer inline-flex items-center gap-1 ${
+                        estaExpandida && formatoActivo === "elastic"
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/60 font-bold shadow-sm shadow-emerald-500/10"
+                          : sinTraducciones
+                          ? "bg-umbra-bg/40 text-umbra-ink-muted/50 border-umbra-line/40 opacity-40 cursor-not-allowed"
+                          : "bg-umbra-bg text-umbra-ink-dim border-umbra-line hover:text-emerald-300 hover:border-emerald-500/40 hover:bg-umbra-surface"
+                      }`}
+                    >
+                      {cargandoId === r.id && formatoActivo === "elastic" ? (
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      ) : null}
+                      Elastic
+                    </button>
+
+                    {/* Botón KQL (Opción B: badge único) */}
+                    <button
+                      type="button"
+                      disabled={sinTraducciones}
+                      onClick={(e) => handleToggleFormato(r.id, "kql", e)}
+                      title={
+                        sinTraducciones
+                          ? "Sin traducciones disponibles para esta regla"
+                          : estaExpandida && formatoActivo === "kql"
+                          ? "Ocultar consulta KQL"
+                          : "Ver consulta Microsoft KQL (Defender XDR / Sentinel)"
+                      }
+                      className={`font-mono text-[10px] px-2 py-0.5 rounded border transition-all cursor-pointer inline-flex items-center gap-1 ${
+                        estaExpandida && formatoActivo === "kql"
+                          ? "bg-sky-500/20 text-sky-300 border-sky-500/60 font-bold shadow-sm shadow-sky-500/10"
+                          : sinTraducciones
+                          ? "bg-umbra-bg/40 text-umbra-ink-muted/50 border-umbra-line/40 opacity-40 cursor-not-allowed"
+                          : "bg-umbra-bg text-umbra-ink-dim border-umbra-line hover:text-sky-300 hover:border-sky-500/40 hover:bg-umbra-surface"
+                      }`}
+                    >
+                      {cargandoId === r.id && formatoActivo === "kql" ? (
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      ) : null}
+                      KQL
+                    </button>
+
+                    {r.url_fuente && (
+                      <a
+                        href={r.url_fuente}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[11px] text-umbra-cyan hover:underline shrink-0 inline-flex items-center gap-1 font-medium transition-colors ml-1"
+                        title="Ver YAML oficial en repositorio SigmaHQ"
+                      >
+                        Ver regla ↗
+                      </a>
+                    )}
+                  </div>
                 </div>
-                {r.url_fuente && (
-                  <a
-                    href={r.url_fuente}
-                    target="_blank"
-                    rel="noopener noreferrer"
+
+                {/* Panel expandible de código de la consulta */}
+                {estaExpandida && (
+                  <div
                     onClick={(e) => e.stopPropagation()}
-                    className="text-[11px] text-umbra-cyan hover:underline shrink-0 inline-flex items-center gap-1 font-medium transition-colors"
+                    className="mt-2.5 pt-2.5 border-t border-umbra-line/70 flex flex-col gap-2 bg-umbra-bg/90 p-3 rounded-lg border border-umbra-line/50"
                   >
-                    Ver regla completa ↗
-                  </a>
+                    {/* Barra de título y selectores de sabor */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Code2 className="w-3.5 h-3.5 text-umbra-cyan shrink-0" />
+                        <span className="text-xs font-semibold text-umbra-ink">
+                          {formatoActivo === "splunk" && "Splunk SPL"}
+                          {formatoActivo === "elastic" && "Elasticsearch Lucene (ECS)"}
+                          {formatoActivo === "kql" && "Microsoft KQL"}
+                        </span>
+
+                        {/* Selector de Sabores KQL si ambos aplican */}
+                        {formatoActivo === "kql" && tradDefender && tradSentinel && (
+                          <div className="inline-flex items-center rounded-md bg-umbra-surface p-0.5 border border-umbra-line text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() => setKqlFlavor("defender")}
+                              className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                                kqlFlavor === "defender"
+                                  ? "bg-sky-500/20 text-sky-300 font-semibold border border-sky-500/40"
+                                  : "text-umbra-ink-dim hover:text-umbra-ink"
+                              }`}
+                            >
+                              Defender XDR {tradDefender.target_table ? `(${tradDefender.target_table})` : ""}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setKqlFlavor("sentinel")}
+                              className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                                kqlFlavor === "sentinel"
+                                  ? "bg-sky-500/20 text-sky-300 font-semibold border border-sky-500/40"
+                                  : "text-umbra-ink-dim hover:text-umbra-ink"
+                              }`}
+                            >
+                              Azure Sentinel
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Indicador individual si solo hay Sentinel */}
+                        {formatoActivo === "kql" && !tradDefender && tradSentinel && (
+                          <span className="font-mono text-[10px] text-umbra-ink-dim bg-umbra-surface border border-umbra-line px-1.5 py-0.5 rounded">
+                            Azure Sentinel / Log Analytics
+                          </span>
+                        )}
+
+                        {/* Indicador individual si solo hay Defender */}
+                        {formatoActivo === "kql" && tradDefender && !tradSentinel && (
+                          <span className="font-mono text-[10px] text-umbra-ink-dim bg-umbra-surface border border-umbra-line px-1.5 py-0.5 rounded">
+                            Defender XDR {tradDefender.target_table ? `(${tradDefender.target_table})` : ""}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Botones de acción: Copiar y Cerrar */}
+                      <div className="flex items-center gap-1.5">
+                        {tradActual && (
+                          <button
+                            type="button"
+                            onClick={(e) =>
+                              handleCopiarQuery(
+                                tradActual!.query,
+                                `${r.id}-${formatoActivo}-${kqlFlavor}`,
+                                e
+                              )
+                            }
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-umbra-surface hover:bg-umbra-surface-hover text-umbra-ink border border-umbra-line transition-colors cursor-pointer"
+                            title="Copiar consulta al portapapeles"
+                          >
+                            {copiadoKey === `${r.id}-${formatoActivo}-${kqlFlavor}` ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <span className="text-emerald-400 font-semibold">¡Copiado!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5 text-umbra-ink-dim" />
+                                <span>Copiar</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setReglaExpandidaId(null)}
+                          className="p-1 rounded text-umbra-ink-dim hover:text-umbra-ink hover:bg-umbra-surface transition-colors cursor-pointer"
+                          title="Cerrar vista de consulta"
+                          aria-label="Cerrar vista de consulta"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Estados del panel: cargando, error, sin traducciones, o consulta lista */}
+                    {cargandoId === r.id ? (
+                      <div className="flex items-center justify-center gap-2 py-6 text-xs text-umbra-ink-muted">
+                        <Loader2 className="w-4 h-4 animate-spin text-umbra-cyan" />
+                        <span>Cargando traducción precomputada...</span>
+                      </div>
+                    ) : errorId === r.id ? (
+                      <div className="py-2.5 px-3 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                        No se pudo obtener la traducción de la regla. Verifique la conexión con el servidor.
+                      </div>
+                    ) : sinTraducciones ? (
+                      <div className="py-2.5 px-3 text-xs text-umbra-ink-muted bg-umbra-surface/50 border border-umbra-line/40 rounded-md">
+                        Esta regla no cuenta con traducciones precomputadas para los backends disponibles (sintaxis no soportada por el estándar de conversión).
+                      </div>
+                    ) : tradActual ? (
+                      <div className="space-y-1.5">
+                        <pre className="p-3 bg-umbra-bg/95 border border-umbra-line/80 rounded-md font-mono text-[11px] text-umbra-ink overflow-x-auto whitespace-pre-wrap break-all leading-relaxed select-all">
+                          <code>{tradActual.query}</code>
+                        </pre>
+                        {tradActual.target_table && (
+                          <div className="text-[10px] text-umbra-ink-dim font-mono">
+                            Tabla objetivo (schema M365D):{" "}
+                            <span className="text-sky-300 font-semibold">{tradActual.target_table}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="py-2.5 px-3 text-xs text-umbra-ink-muted bg-umbra-surface/50 border border-umbra-line/40 rounded-md">
+                        No hay traducción disponible para este formato específico.
+                      </div>
+                    )}
+                  </div>
                 )}
               </li>
             );

@@ -24,6 +24,15 @@ class ReglaOut(BaseModel):
     class Config:
         from_attributes = True
 
+class ReglaTraduccionOut(BaseModel):
+    formato: str
+    query: str
+    flavor_label: Optional[str] = None
+    target_table: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 class TecnicaDetalleOut(BaseModel):
     id: str
     nombre: str

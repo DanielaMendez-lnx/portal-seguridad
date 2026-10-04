@@ -8,3 +8,13 @@ venv/
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Artefactos temporales experimento pySigma
+venv_pysigma/
+temp_rules_sample/
+temp_sigma_all.zip
+reporte_conversion_sigma.*
+reporte_calidad_semantica.json
+run_pysigma_experiment.py
+analizar_resultados.py
+evaluar_calidad_semantica.py
