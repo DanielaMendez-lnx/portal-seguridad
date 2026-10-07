@@ -312,8 +312,8 @@ function ListaReglasSigma({
                 }`}
               >
                 {/* Fila principal de la regla */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -329,7 +329,7 @@ function ListaReglasSigma({
                           dominio_nombre: dominioNombre,
                         });
                       }}
-                      className={`p-1 rounded-md transition-colors shrink-0 focus:outline-none focus:ring-1 focus:ring-amber-400/50 ${
+                      className={`p-1 rounded-md transition-colors shrink-0 mt-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400/50 ${
                         favorita
                           ? "text-amber-400 hover:text-amber-300"
                           : "text-umbra-ink-muted hover:text-amber-300 hover:bg-umbra-surface"
@@ -352,11 +352,11 @@ function ListaReglasSigma({
                       />
                     </button>
 
-                    <span className="font-mono text-[10px] text-umbra-cyan bg-umbra-cyan/10 border border-umbra-cyan/30 px-1.5 py-0.5 rounded shrink-0">
+                    <span className="font-mono text-[10px] text-umbra-cyan bg-umbra-cyan/10 border border-umbra-cyan/30 px-1.5 py-0.5 rounded shrink-0 mt-0.5">
                       {r.formato}
                     </span>
                     <span
-                      className={`leading-snug truncate ${estaExpandida ? "font-semibold text-umbra-ink" : ""}`}
+                      className={`leading-snug break-words flex-1 ${estaExpandida ? "font-semibold text-umbra-ink" : ""}`}
                       title={r.nombre}
                     >
                       {r.nombre}
@@ -364,7 +364,7 @@ function ListaReglasSigma({
                   </div>
 
                   {/* Acciones: Badges de SIEM/XDR y enlace a fuente */}
-                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto flex-wrap">
+                  <div className="flex items-center gap-1.5 self-end flex-wrap pl-7">
                     {/* Botón Splunk */}
                     <button
                       type="button"
